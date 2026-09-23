@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self';" />
+  <title>MeetingScribe</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <nav class="sidebar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span>MeetingScribe</span>
+      </div>
+      <button class="nav-btn active" data-screen="home">
+        <span class="nav-icon">●</span> Record
+      </button>
+      <button class="nav-btn" data-screen="history">
+        <span class="nav-icon">☰</span> History
+        <span id="history-badge" class="badge hidden">0</span>
+      </button>
+      <button class="nav-btn" data-screen="settings">
+        <span class="nav-icon">⚙</span> Settings
+      </button>
+      <div class="sidebar-footer">
+        <div id="backend-indicator" class="backend-indicator">
+          <span class="dot"></span><span class="label">No backend set</span>
+        </div>
+        <div id="app-version" class="muted small"></div>
+      </div>
+    </nav>
+
+    <main class="content">
+      <!-- ============================= HOME / RECORD ============================= -->
+      <section id="screen-home" class="screen active">
+        <header class="screen-header">
+          <h1>Record</h1>
+          <p class="muted">Record from your microphone or import an existing audio file. It will be uploaded and transcribed automatically.</p>
+        </header>
+
+        <div class="record-panel">
+          <div id="timer" class="timer">00:00</div>
+          <div id="level-meter" class="level-meter"><div id="level-bar"></div></div>
+
+          <div class="record-actions">
+            <button id="record-btn" class="record-btn" title="Start recording">
+              <span class="record-icon"></span>
+              <span class="record-label">Record</span>
+            </button>
+            <button id="import-btn" class="btn btn-secondary btn-large" title="Import a .wav, .mp3 or .m4a file">
+              Import Audio File
+            </button>
+          </div>
+          <p class="muted small">Supported imports: .wav, .mp3, .m4a — or drop a file anywhere on this screen.</p>
+        </div>
+
+        <div id="status-card" class="status-card hidden">
+          <div class="status-card-head">
+            <span id="status-name" class="status-name"></span>
+            <span id="status-source" class="tag"></span>
+          </div>
+          <ol class="steps">
+            <li data-step="uploading"><span class="step-dot"></span>Uploading</li>
+            <li data-step="transcribing"><span class="step-dot"></span>Transcribing</li>
+            <li data-step="done"><span class="step-dot"></span>Done</li>
+          </ol>
+          <div id="status-message" class="status-message"></div>
+          <div class="status-actions">
+            <button id="status-view-btn" class="btn btn-primary hidden">View transcript</button>
+            <button id="status-retry-btn" class="btn btn-secondary hidden">Retry</button>
+          </div>
+        </div>
+
+        <div id="home-error" class="alert alert-error hidden" role="alert"></div>
+      </section>
+
+      <!-- ================================ HISTORY ================================ -->
+      <section id="screen-history" class="screen">
+        <header class="screen-header row">
+          <div>
+            <h1>History</h1>
+            <p class="muted">Past recordings and imports. Transcripts are stored locally and available offline.</p>
+          </div>
+          <button id="open-folder-btn" class="btn btn-secondary">Open recordings folder</button>
+        </header>
+
+        <div class="history-layout">
+          <div id="history-list" class="history-list">
+            <div class="empty">No recordings yet.</div>
+          </div>
+
+          <div id="transcript-view" class="transcript-view">
+            <div class="empty">Select a recording to view its transcript.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================ SETTINGS =============================== -->
+      <section id="screen-settings" class="screen">
+        <header class="screen-header">
+          <h1>Settings</h1>
+          <p class="muted">Configure where MeetingScribe sends audio for transcription.</p>
+        </header>
+
+        <form id="settings-form" class="settings-form">
+          <label for="api-base-url">Backend API base URL</label>
+          <input id="api-base-url" type="url" placeholder="http://<ec2-ip>:8000" autocomplete="off" spellcheck="false" />
+          <p class="muted small">Example: <code>http://54.12.34.56:8000</code>. No trailing slash needed. Saved automatically between launches.</p>
+          <div class="settings-actions">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" id="test-connection-btn" class="btn btn-secondary">Test connection</button>
+            <span id="settings-status" class="muted small"></span>
+          </div>
+        </form>
+
+        <div class="settings-info muted small">
+          <div>Data folder: <code id="data-dir"></code></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="wav-recorder.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
