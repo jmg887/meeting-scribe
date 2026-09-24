@@ -1,0 +1,45 @@
+appId: com.meetingscribe.app
+productName: MeetingScribe
+copyright: Copyright © 2026 MeetingScribe
+directories:
+  output: dist
+  buildResources: build
+files:
+  - src/**/*
+  - package.json
+  - "!**/*.map"
+asar: true
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  icon: build/icon.png
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    NSMicrophoneUsageDescription: "MeetingScribe needs access to your microphone to record audio for transcription."
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: MeetingScribe

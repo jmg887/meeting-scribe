@@ -1,0 +1,23 @@
+{
+  "name": "meetingscribe",
+  "productName": "MeetingScribe",
+  "version": "0.1.0",
+  "description": "Record or import audio and get it transcribed.",
+  "main": "src/main/main.js",
+  "author": "MeetingScribe",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "mock-backend": "node scripts/mock-backend.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  }
+}
