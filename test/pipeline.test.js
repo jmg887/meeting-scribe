@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { Store, SOURCE } = require('../src/main/store');
-const { Pipeline, wavDurationSeconds, isSupportedAudio } = require('../src/main/pipeline');
+const { Pipeline, wavDurationSeconds, isSupportedAudio, SUPPORTED_EXTENSIONS, supportedExtensionsLabel } = require('../src/main/pipeline');
 const { ApiClient, ApiError } = require('../src/main/api');
 const { createMockBackend } = require('../scripts/mock-backend');
 
@@ -32,9 +32,15 @@ test('wav header duration + extension check', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ms-wav-'));
   const p = makeWav(dir, 3);
   assert.equal(wavDurationSeconds(p), 3);
-  assert.equal(isSupportedAudio('a.MP3'), true);
-  assert.equal(isSupportedAudio('a.m4a'), true);
-  assert.equal(isSupportedAudio('a.ogg'), false);
+  for (const ext of ['wav', 'mp3', 'm4a', 'ogg', 'flac', 'aac', 'opus']) {
+    assert.equal(isSupportedAudio(`a.${ext}`), true, ext);
+    assert.equal(isSupportedAudio(`a.${ext.toUpperCase()}`), true, `${ext} (upper)`);
+  }
+  for (const ext of ['wma', 'webm', 'mp4', 'txt', '']) {
+    assert.equal(isSupportedAudio(`a.${ext}`), false, ext || '(none)');
+  }
+  assert.deepEqual(SUPPORTED_EXTENSIONS, ['.wav', '.mp3', '.m4a', '.ogg', '.flac', '.aac', '.opus']);
+  assert.equal(supportedExtensionsLabel('or'), '.wav, .mp3, .m4a, .ogg, .flac, .aac or .opus');
   fs.writeFileSync(path.join(dir, 'x.wav'), 'nope');
   assert.equal(wavDurationSeconds(path.join(dir, 'x.wav')), null);
 });

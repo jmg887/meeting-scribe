@@ -68,7 +68,11 @@ function createMockBackend({ delayMs = 4000, fail = false, logger = () => {} } =
         jobs.set(jobId, {
           readyAt: Date.now() + delayMs,
           fail,
-          transcript: `[mock transcript] Received ${bytes} bytes for ${body.s3_key.split('-').slice(-1)[0]}.\n\nThis is placeholder text produced by the mock backend so you can exercise the app end-to-end without a real transcription service.`,
+          transcript: [
+            `[mock transcript] Received ${bytes} bytes for ${body.s3_key.split('-').slice(-1)[0]}.`,
+            'This is placeholder text produced by the mock backend so you can exercise the app end-to-end without a real transcription service.',
+            'Paragraphs are separated by blank lines, mirroring the natural pauses the real service emits.\nA single newline inside a paragraph is preserved too.',
+          ].join('\n\n'),
         });
         return json(res, 200, { job_id: jobId });
       }

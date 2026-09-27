@@ -11,8 +11,8 @@ local, offline-readable history.
 
 | Screen | What it does |
 | --- | --- |
-| **Record** | Big record/stop button with a live timer and level meter. On stop, audio is saved locally as a 16 kHz mono 16-bit PCM `.wav`, then the upload → transcribe flow starts automatically. `Import Audio File` opens a native picker (`.wav`, `.mp3`, `.m4a`) and runs the same flow. Drag-and-drop onto the panel also works. A status card shows **Uploading → Transcribing → Done** (or an error with a Retry button). |
-| **History** | Every recording/import with date, duration, source (Recorded / Imported) and status. Click one to read the transcript. **Copy** to clipboard, **Export .txt**, Show file, Delete, and Retry for failed jobs. Works offline for stored transcripts. |
+| **Record** | Big record/stop button with a live timer and level meter. On stop, audio is saved locally as a 16 kHz mono 16-bit PCM `.wav`, then the upload → transcribe flow starts automatically. `Import Audio File` opens a native picker (`.wav`, `.mp3`, `.m4a`, `.ogg`, `.flac`, `.aac`, `.opus`) and runs the same flow. Drag-and-drop onto the panel also works. A status card shows **Uploading → Transcribing → Done** (or an error with a Retry button). |
+| **History** | Every recording/import with date, duration, source (Recorded / Imported) and status. Click one to read the transcript; paragraph breaks (`\n\n`) from the backend are rendered as separate paragraphs. **Copy** to clipboard and **Export .txt** use the stored text verbatim, so breaks are preserved. Also Show file, Delete, and Retry for failed jobs. Works offline for stored transcripts. |
 | **Settings** | Backend API base URL (e.g. `http://<ec2-ip>:8000`), persisted between launches, plus a "Test connection" button. |
 
 ## Backend contract
@@ -85,6 +85,14 @@ Notes:
 - Packaging config lives in `electron-builder.yml`; the icon is
   `build/icon.png` (electron-builder converts it to `.ico` / `.icns`).
 
+## Supported import formats
+
+`.wav`, `.mp3`, `.m4a`, `.ogg`, `.flac`, `.aac`, `.opus` — defined once in
+`src/main/pipeline.js` (`MIME_BY_EXT`). The native picker filter, drag-and-drop
+validation, the "unsupported type" error and the Record-screen hint all derive
+from that list, so adding a format is a one-line change. The backend decodes
+via ffmpeg, so no server change is needed.
+
 ## Where data lives
 
 All data is stored in Electron's per-user `userData` directory:
@@ -111,7 +119,7 @@ The exact folder is shown at the bottom of the Settings screen.
 | Non-2xx or malformed backend response | Status code + backend `detail` message |
 | Presigned upload rejected/expired | "Upload failed: storage returned 403…" |
 | Transcription `status: error` | "Transcription failed: <backend error>" |
-| Unsupported import type | "Unsupported file type ".ogg". Please choose a .wav, .mp3 or .m4a file." |
+| Unsupported import type | "Unsupported file type ".wma". Please choose a .wav, .mp3, .m4a, .ogg, .flac, .aac or .opus file." |
 | Mic permission denied / no mic / mic busy | Specific message; on macOS the system permission prompt is triggered first |
 | App closed mid-job | On next launch the job is marked failed with a hint to Retry |
 

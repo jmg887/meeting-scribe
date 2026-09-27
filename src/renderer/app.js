@@ -215,7 +215,7 @@
     }
   }
 
-  /** Imported mp3/m4a have no header duration; decode in the renderer to fill it in. */
+  /** Non-WAV imports have no header we parse; decode in the renderer to fill in the duration. */
   async function backfillDuration(rec) {
     if (Number.isFinite(rec.durationSec)) return;
     const d = await probeDuration(rec.filePath);
@@ -362,6 +362,7 @@
     for (const rec of state.recordings) {
       const item = el('div', {
         class: `history-item${rec.id === state.selectedId ? ' selected' : ''}`,
+        'data-id': rec.id,
         onclick: () => {
           state.selectedId = rec.id;
           renderHistory();
@@ -467,12 +468,36 @@
     view.appendChild(head);
 
     if (hasTranscript) {
-      view.appendChild(el('div', { class: 'transcript-text', text: rec.transcript || '(empty transcript)' }));
+      view.appendChild(renderTranscriptText(rec.transcript));
     } else if (rec.status === 'error') {
       view.appendChild(el('div', { class: 'alert alert-error', text: rec.error || 'Transcription failed.' }));
     } else {
       view.appendChild(el('div', { class: 'transcript-pending', text: `${STATUS_LABEL[rec.status] || rec.status}… the transcript will appear here when it is ready.` }));
     }
+  }
+
+  /**
+   * Build the transcript body. Paragraphs are separated by blank lines (\n\n)
+   * in the stored text; each becomes its own <p>. Single line breaks inside a
+   * paragraph are kept via `white-space: pre-wrap`. The stored string itself is
+   * never modified here — Copy and Export use it verbatim.
+   */
+  function renderTranscriptText(transcript) {
+    const container = el('div', { class: 'transcript-text' });
+    const text = typeof transcript === 'string' ? transcript : '';
+    if (!text.trim()) {
+      container.appendChild(el('p', { class: 'muted', text: '(empty transcript)' }));
+      return container;
+    }
+    const paragraphs = text
+      .replace(/\r\n?/g, '\n')
+      .split(/\n[ \t]*\n+/)
+      .map((p) => p.replace(/^\n+|\n+$/g, ''))
+      .filter((p) => p.length > 0);
+    for (const p of paragraphs) {
+      container.appendChild(el('p', { text: p }));
+    }
+    return container;
   }
 
   $('#open-folder-btn').addEventListener('click', () => window.api.app.openRecordingsFolder());
@@ -506,6 +531,8 @@
       status.textContent = 'Saved';
       status.style.color = 'var(--success)';
       renderBackendIndicator();
+      // The Record screen's "no backend configured" banner is no longer accurate once a URL is saved.
+      if (state.settings.apiBaseUrl) showHomeError('');
       toast('Settings saved', 'success');
     } catch (err) {
       status.textContent = err.message;
@@ -558,6 +585,11 @@
       $('#api-base-url').value = settings.apiBaseUrl || '';
       $('#data-dir').textContent = info.dataDir;
       $('#app-version').textContent = `v${info.version}`;
+      if (Array.isArray(info.supportedExtensions) && info.supportedExtensions.length) {
+        // Keep the on-screen list in sync with what main-process validation accepts.
+        $('#supported-formats').textContent = info.supportedExtensions.join(', ');
+        $('#import-btn').title = `Import a ${info.supportedExtensions.join(', ')} file`;
+      }
       renderBackendIndicator();
       updateBadge();
 
