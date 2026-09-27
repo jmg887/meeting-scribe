@@ -4,6 +4,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const $ = (s) => document.querySelector(s);
   const result = { ok: false, steps: [] };
+  const state0 = (item) => item.dataset.id;
   const step = (name, ok, info) => { result.steps.push({ name, ok, info }); log(name, ok ? 'OK' : 'FAIL', info || ''); };
 
   try {
@@ -49,8 +50,25 @@
 
     // Import flow via path (bypasses native dialog) — unsupported ext must fail gracefully
     let unsupportedMsg = '';
-    try { await window.api.recordings.importPath(rec.filePath.replace(/\.wav$/, '.ogg')); } catch (e) { unsupportedMsg = e.message; }
-    step('import.unsupported', /Unsupported file type/.test(unsupportedMsg), unsupportedMsg);
+    try { await window.api.recordings.importPath(rec.filePath.replace(/\.wav$/, '.wma')); } catch (e) { unsupportedMsg = e.message; }
+    step('import.unsupported', /Unsupported file type ".wma"/.test(unsupportedMsg) && /\.opus/.test(unsupportedMsg), unsupportedMsg);
+    step('ui.supportedFormats', $('#supported-formats').textContent === '.wav, .mp3, .m4a, .ogg, .flac, .aac, .opus', $('#supported-formats').textContent);
+
+    // Newly supported extension (.ogg) must be accepted by the validator. The test harness
+    // provides the file via window.__SMOKE_OGG_PATH__ (a copy of the wav with an .ogg name).
+    if (window.__SMOKE_OGG_PATH__) {
+      let oggRec = null;
+      try { oggRec = await window.api.recordings.importPath(window.__SMOKE_OGG_PATH__); } catch (e) { oggRec = { error: e.message }; }
+      step('import.oggAccepted', !!(oggRec && oggRec.id) && /\.ogg$/.test(oggRec.originalName), oggRec && (oggRec.error || oggRec.originalName));
+      if (oggRec && oggRec.id) {
+        // Let its pipeline settle so the later history assertions are deterministic.
+        for (let i = 0; i < 60; i++) {
+          const cur = await window.api.recordings.get(oggRec.id);
+          if (!cur || cur.status === 'done' || cur.status === 'error') break;
+          await sleep(500);
+        }
+      }
+    }
 
     const imported = await window.api.recordings.importPath(rec.filePath);
     let imp = null;
@@ -65,17 +83,23 @@
     $('.nav-btn[data-screen="history"]').click();
     await sleep(200);
     const items = document.querySelectorAll('.history-item');
-    step('history.list', items.length === 2, items.length);
+    const expectedItems = window.__SMOKE_OGG_PATH__ ? 3 : 2; // recording + wav import (+ ogg import)
+    step('history.list', items.length === expectedItems, items.length);
     items[0].click();
     await sleep(100);
     const text = $('.transcript-text') && $('.transcript-text').textContent;
     step('history.transcript', !!text && /mock transcript/.test(text));
+    const paras = document.querySelectorAll('.transcript-text p');
+    step('history.paragraphs', paras.length === 3, paras.length);
+    const stored = (await window.api.recordings.get(state0(items[0]))).transcript;
+    step('history.paragraphSplit', stored.split('\n\n').length === 3 && /\n/.test(paras[2].textContent) && paras[2].textContent === stored.split('\n\n')[2]);
     const tags = Array.from(document.querySelectorAll('.history-item .tag')).map((t) => t.textContent);
     step('history.sourceTags', tags.includes('Imported') && tags.includes('Recorded'), tags.join(','));
 
-    // Copy to clipboard
-    await window.api.transcript.copy(text);
-    step('transcript.copy', true);
+    // Copy to clipboard must use the stored text verbatim (paragraph breaks intact)
+    await window.api.transcript.copy(stored);
+    const clip = await window.api.transcript.readClipboard();
+    step('transcript.copy', clip === stored && clip.includes('\n\n'), clip.length);
 
     // Error path: point at dead backend, retry -> error status + retry button
     await window.api.settings.update({ apiBaseUrl: 'http://127.0.0.1:1' });

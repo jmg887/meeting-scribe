@@ -16,13 +16,30 @@ const fs = require('fs');
 const { ApiClient, ApiError } = require('./api');
 const { STATUS } = require('./store');
 
+/**
+ * Accepted import formats. This is the single source of truth: the native file
+ * picker filter, drag-and-drop validation and the "unsupported type" error all
+ * derive from it. The backend decodes anything via ffmpeg, so this list is only
+ * about what the desktop app lets through.
+ */
 const MIME_BY_EXT = {
   '.wav': 'audio/wav',
   '.mp3': 'audio/mpeg',
   '.m4a': 'audio/mp4',
+  '.ogg': 'audio/ogg',
+  '.flac': 'audio/flac',
+  '.aac': 'audio/aac',
+  '.opus': 'audio/opus',
 };
 
 const SUPPORTED_EXTENSIONS = Object.keys(MIME_BY_EXT);
+
+/** Human-readable list, e.g. ".wav, .mp3, .m4a, .ogg, .flac, .aac or .opus" */
+function supportedExtensionsLabel(finalJoiner = 'or') {
+  const exts = SUPPORTED_EXTENSIONS;
+  if (exts.length <= 1) return exts.join('');
+  return `${exts.slice(0, -1).join(', ')} ${finalJoiner} ${exts[exts.length - 1]}`;
+}
 
 function isSupportedAudio(filePath) {
   return SUPPORTED_EXTENSIONS.includes(path.extname(filePath).toLowerCase());
@@ -152,4 +169,11 @@ class Pipeline extends EventEmitter {
   }
 }
 
-module.exports = { Pipeline, isSupportedAudio, mimeFor, wavDurationSeconds, SUPPORTED_EXTENSIONS };
+module.exports = {
+  Pipeline,
+  isSupportedAudio,
+  mimeFor,
+  wavDurationSeconds,
+  SUPPORTED_EXTENSIONS,
+  supportedExtensionsLabel,
+};

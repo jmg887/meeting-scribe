@@ -6,7 +6,13 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 
 const { Store, SOURCE, STATUS } = require('./store');
-const { Pipeline, isSupportedAudio, wavDurationSeconds, SUPPORTED_EXTENSIONS } = require('./pipeline');
+const {
+  Pipeline,
+  isSupportedAudio,
+  wavDurationSeconds,
+  SUPPORTED_EXTENSIONS,
+  supportedExtensionsLabel,
+} = require('./pipeline');
 const { ApiClient } = require('./api');
 
 let mainWindow = null;
@@ -97,6 +103,10 @@ function createWindow() {
         const scriptPath = process.env.MEETINGSCRIBE_SMOKE_SCRIPT
           || path.join(__dirname, '..', '..', 'scripts', 'smoke-renderer.js');
         const script = fs.readFileSync(scriptPath, 'utf8');
+        if (process.env.MEETINGSCRIBE_SMOKE_OGG_PATH) {
+          await mainWindow.webContents.executeJavaScript(
+            `window.__SMOKE_OGG_PATH__ = ${JSON.stringify(process.env.MEETINGSCRIBE_SMOKE_OGG_PATH)};`, true);
+        }
         const result = await mainWindow.webContents.executeJavaScript(script, true);
         console.log('SMOKE_RESULT ' + JSON.stringify(result));
         app.exit(result && result.ok ? 0 : 1);
@@ -163,7 +173,7 @@ function registerIpc() {
       title: 'Import Audio File',
       properties: ['openFile'],
       filters: [
-        { name: 'Audio Files', extensions: ['wav', 'mp3', 'm4a'] },
+        { name: 'Audio Files', extensions: SUPPORTED_EXTENSIONS.map((ext) => ext.slice(1)) },
         { name: 'All Files', extensions: ['*'] },
       ],
     });
@@ -183,9 +193,10 @@ function registerIpc() {
 
   // Transcript actions
   ipcMain.handle('transcript:copy', safe((_e, text) => {
-    clipboard.writeText(text || '');
+    clipboard.writeText(text || ''); // verbatim: paragraph breaks are preserved
     return true;
   }));
+  ipcMain.handle('transcript:readClipboard', safe(() => clipboard.readText()));
   ipcMain.handle('transcript:export', safe(async (_e, { id }) => {
     const rec = store.getRecording(id);
     if (!rec || !rec.transcript) throw new Error('No transcript to export.');
@@ -235,7 +246,7 @@ function registerIpc() {
 async function importFromPath(src, durationSec) {
   if (!src) throw new Error('No file selected.');
   if (!isSupportedAudio(src)) {
-    throw new Error(`Unsupported file type "${path.extname(src) || '(none)'}". Please choose a .wav, .mp3 or .m4a file.`);
+    throw new Error(`Unsupported file type "${path.extname(src) || '(none)'}". Please choose a ${supportedExtensionsLabel('or')} file.`);
   }
   let stat;
   try {

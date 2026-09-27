@@ -209,6 +209,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
   background: #fafbfe; border: 1px solid var(--border); border-radius: 8px; padding: 14px;
   font-size: 14px; user-select: text;
 }
+/* One <p> per paragraph (split on blank lines); pre-wrap keeps single newlines inside a paragraph. */
+.transcript-text p { margin: 0 0 1em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.transcript-text p:last-child { margin-bottom: 0; }
 .transcript-pending { padding: 24px; text-align: center; color: var(--muted); }
 
 .empty { padding: 32px; text-align: center; color: var(--muted); }
