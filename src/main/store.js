@@ -4,7 +4,7 @@
  * Local persistence for MeetingScribe.
  *
  * Two JSON files live in the app's userData directory:
- *   - settings.json  -> { apiBaseUrl }
+ *   - settings.json  -> { apiBaseUrl, numSpeakers }
  *   - history.json   -> { recordings: [ ... ] }
  *
  * Everything is written atomically (write temp file, then rename) so a crash
@@ -18,7 +18,38 @@ const crypto = require('crypto');
 
 const DEFAULT_SETTINGS = Object.freeze({
   apiBaseUrl: '',
+  /** Expected speaker count hint for diarization; null = auto-detect. */
+  numSpeakers: null,
 });
+
+const NUM_SPEAKERS_MIN = 1;
+const NUM_SPEAKERS_MAX = 20;
+
+/**
+ * Coerce a user-supplied speaker count into an integer in [1, 20] or null.
+ * Blank / null / undefined / 0 / non-numeric all mean "auto-detect" (null).
+ * Throws for out-of-range or fractional values so the UI can show a message.
+ */
+function normalizeNumSpeakers(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return null;
+    if (!/^\d+$/.test(trimmed)) {
+      throw new Error('Expected number of speakers must be a whole number.');
+    }
+    value = Number(trimmed);
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if (value === 0) return null;
+  if (!Number.isInteger(value)) {
+    throw new Error('Expected number of speakers must be a whole number.');
+  }
+  if (value < NUM_SPEAKERS_MIN || value > NUM_SPEAKERS_MAX) {
+    throw new Error(`Expected number of speakers must be between ${NUM_SPEAKERS_MIN} and ${NUM_SPEAKERS_MAX}.`);
+  }
+  return value;
+}
 
 /** Allowed recording statuses, in pipeline order. */
 const STATUS = Object.freeze({
@@ -75,6 +106,12 @@ class Store {
     fs.mkdirSync(this.recordingsDir, { recursive: true });
 
     this._settings = { ...DEFAULT_SETTINGS, ...readJson(this.settingsFile, {}) };
+    // Sanitize anything hand-edited or written by an older version.
+    try {
+      this._settings.numSpeakers = normalizeNumSpeakers(this._settings.numSpeakers);
+    } catch (_) {
+      this._settings.numSpeakers = null;
+    }
     const hist = readJson(this.historyFile, { recordings: [] });
     this._recordings = Array.isArray(hist.recordings) ? hist.recordings : [];
   }
@@ -89,6 +126,9 @@ class Store {
     const next = { ...this._settings };
     if (patch && Object.prototype.hasOwnProperty.call(patch, 'apiBaseUrl')) {
       next.apiBaseUrl = normalizeBaseUrl(patch.apiBaseUrl);
+    }
+    if (patch && Object.prototype.hasOwnProperty.call(patch, 'numSpeakers')) {
+      next.numSpeakers = normalizeNumSpeakers(patch.numSpeakers);
     }
     this._settings = next;
     writeJsonAtomic(this.settingsFile, this._settings);
@@ -182,4 +222,13 @@ class Store {
   }
 }
 
-module.exports = { Store, STATUS, SOURCE, DEFAULT_SETTINGS, normalizeBaseUrl };
+module.exports = {
+  Store,
+  STATUS,
+  SOURCE,
+  DEFAULT_SETTINGS,
+  normalizeBaseUrl,
+  normalizeNumSpeakers,
+  NUM_SPEAKERS_MIN,
+  NUM_SPEAKERS_MAX,
+};

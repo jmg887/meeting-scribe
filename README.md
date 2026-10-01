@@ -13,7 +13,7 @@ local, offline-readable history.
 | --- | --- |
 | **Record** | Big record/stop button with a live timer and level meter. On stop, audio is saved locally as a 16 kHz mono 16-bit PCM `.wav`, then the upload → transcribe flow starts automatically. `Import Audio File` opens a native picker (`.wav`, `.mp3`, `.m4a`, `.ogg`, `.flac`, `.aac`, `.opus`) and runs the same flow. Drag-and-drop onto the panel also works. A status card shows **Uploading → Transcribing → Done** (or an error with a Retry button). |
 | **History** | Every recording/import with date, duration, source (Recorded / Imported) and status. Click one to read the transcript; paragraph breaks (`\n\n`) from the backend are rendered as separate paragraphs. **Copy** to clipboard and **Export .txt** use the stored text verbatim, so breaks are preserved. Also Show file, Delete, and Retry for failed jobs. Works offline for stored transcripts. |
-| **Settings** | Backend API base URL (e.g. `http://<ec2-ip>:8000`), persisted between launches, plus a "Test connection" button. |
+| **Settings** | Backend API base URL (e.g. `http://<ec2-ip>:8000`), persisted between launches, plus a "Test connection" button. Optional **Expected number of speakers** (1–20, blank = auto-detect) — a diarization hint sent as `num_speakers` on `/transcribe`. |
 
 ## Backend contract
 
@@ -23,7 +23,9 @@ The app is a client for this REST API (base URL configurable in Settings):
 POST {base}/upload-url        { "filename": "recording.wav" }
                               -> { "upload_url": "<presigned S3 URL>", "s3_key": "<key>" }
 PUT  {upload_url}             raw audio bytes (no auth headers)
-POST {base}/transcribe        { "s3_key": "<key>" }   -> { "job_id": "<uuid>" }
+POST {base}/transcribe        { "s3_key": "<key>", "num_speakers": 3 }   -> { "job_id": "<uuid>" }
+                              (num_speakers is included only when set in Settings;
+                               omitted entirely — never null/0 — when blank)
 GET  {base}/status/{job_id}   -> { "job_id", "status": "processing"|"done"|"error",
                                    "transcript"?, "error"? }
 ```
@@ -102,7 +104,7 @@ All data is stored in Electron's per-user `userData` directory:
 | Windows | `%APPDATA%\MeetingScribe\` |
 | macOS | `~/Library/Application Support/MeetingScribe/` |
 
-- `settings.json` — `{ "apiBaseUrl": "..." }`
+- `settings.json` — `{ "apiBaseUrl": "...", "numSpeakers": 3 | null }`
 - `history.json` — array of recordings with status, transcript, S3 key, job id
 - `recordings/` — the `.wav` files you recorded and copies of imported files
 

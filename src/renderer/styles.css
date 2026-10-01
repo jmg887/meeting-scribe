@@ -225,6 +225,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
   width: 100%; font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
 }
 .settings-form input:focus { outline: 2px solid rgba(37,99,235,0.35); border-color: var(--primary); }
+.settings-form input.input-narrow { width: 160px; }
+.settings-form input.invalid { border-color: var(--danger); outline: 2px solid rgba(220,38,38,0.25); }
 .settings-form p { margin: 8px 0 16px; }
 .settings-actions { display: flex; gap: 10px; align-items: center; }
 .settings-info { margin-top: 18px; }

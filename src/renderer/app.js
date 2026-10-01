@@ -515,6 +515,40 @@
     }
   }
 
+  /**
+   * Validate the speaker-count input. Returns { ok, value } where value is an
+   * integer 1..20 or null for blank (auto-detect).
+   */
+  function readNumSpeakersInput() {
+    const input = $('#num-speakers');
+    const raw = input.value.trim();
+    input.classList.remove('invalid');
+    if (raw === '') return { ok: true, value: null };
+    const n = Number(raw);
+    if (!/^\d+$/.test(raw) || !Number.isInteger(n)) {
+      input.classList.add('invalid');
+      return { ok: false, message: 'Expected number of speakers must be a whole number.' };
+    }
+    if (n < 1 || n > 20) {
+      input.classList.add('invalid');
+      return { ok: false, message: 'Expected number of speakers must be between 1 and 20 (or blank to auto-detect).' };
+    }
+    return { ok: true, value: n };
+  }
+
+  // Live feedback while typing, so an out-of-range value is flagged before Save.
+  $('#num-speakers').addEventListener('input', () => {
+    const res = readNumSpeakersInput();
+    const status = $('#settings-status');
+    if (!res.ok) {
+      status.textContent = res.message;
+      status.style.color = 'var(--danger)';
+    } else if (status.style.color === 'var(--danger)') {
+      status.textContent = '';
+      status.style.color = '';
+    }
+  });
+
   $('#settings-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = $('#api-base-url');
@@ -525,9 +559,16 @@
       status.style.color = 'var(--danger)';
       return;
     }
+    const speakers = readNumSpeakersInput();
+    if (!speakers.ok) {
+      status.textContent = speakers.message;
+      status.style.color = 'var(--danger)';
+      return;
+    }
     try {
-      state.settings = await window.api.settings.update({ apiBaseUrl: value });
+      state.settings = await window.api.settings.update({ apiBaseUrl: value, numSpeakers: speakers.value });
       input.value = state.settings.apiBaseUrl;
+      $('#num-speakers').value = state.settings.numSpeakers == null ? '' : String(state.settings.numSpeakers);
       status.textContent = 'Saved';
       status.style.color = 'var(--success)';
       renderBackendIndicator();
@@ -583,6 +624,7 @@
       state.settings = settings;
       state.recordings = recordings;
       $('#api-base-url').value = settings.apiBaseUrl || '';
+      $('#num-speakers').value = settings.numSpeakers == null ? '' : String(settings.numSpeakers);
       $('#data-dir').textContent = info.dataDir;
       $('#app-version').textContent = `v${info.version}`;
       if (Array.isArray(info.supportedExtensions) && info.supportedExtensions.length) {

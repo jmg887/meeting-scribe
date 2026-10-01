@@ -23,6 +23,18 @@
     await sleep(1500);
     step('settings.testConnection', /reachable/i.test($('#settings-status').textContent), $('#settings-status').textContent);
 
+    // Expected number of speakers: out-of-range rejected in the UI, nothing persisted
+    const nsInput = $('#num-speakers');
+    nsInput.value = '25';
+    $('#settings-form').requestSubmit();
+    await sleep(200);
+    step('settings.numSpeakers.reject', /between 1 and 20/.test($('#settings-status').textContent) && (await window.api.settings.get()).numSpeakers === null, $('#settings-status').textContent);
+    // Valid value persists; the first recording below must send num_speakers=3
+    nsInput.value = '3';
+    $('#settings-form').requestSubmit();
+    await sleep(300);
+    step('settings.numSpeakers.save', (await window.api.settings.get()).numSpeakers === 3 && nsInput.value === '3');
+
     // Home: record ~2s using the fake mic
     $('.nav-btn[data-screen="home"]').click();
     $('#record-btn').click();
@@ -41,6 +53,15 @@
       if (rec && (rec.status === 'done' || rec.status === 'error')) break;
     }
     step('record.pipeline', !!rec && rec.status === 'done', rec && (rec.status + ' ' + (rec.error || '')));
+    step('record.numSpeakersSent', !!rec && /num_speakers=3/.test(rec.transcript || ''), rec && (rec.transcript || '').slice(0, 90));
+
+    // Clear the hint via the UI; the import below must omit num_speakers entirely
+    $('.nav-btn[data-screen="settings"]').click();
+    $('#num-speakers').value = '';
+    $('#settings-form').requestSubmit();
+    await sleep(300);
+    step('settings.numSpeakers.clear', (await window.api.settings.get()).numSpeakers === null);
+    $('.nav-btn[data-screen="home"]').click();
     step('record.duration', !!rec && rec.durationSec > 1.5 && rec.durationSec < 3.5, rec && rec.durationSec);
     step('record.source', !!rec && rec.source === 'recording', rec && rec.source);
     step('record.wavSize', !!rec && rec.sizeBytes > 16000 * 2 * 1.5, rec && rec.sizeBytes);
@@ -78,6 +99,7 @@
       if (imp.status === 'done' || imp.status === 'error') break;
     }
     step('import.pipeline', imp && imp.status === 'done' && imp.source === 'import', imp && imp.status);
+    step('import.numSpeakersOmitted', !!imp && /auto-detect/.test(imp.transcript || ''), imp && (imp.transcript || '').slice(0, 90));
 
     // History screen renders both + transcript view
     $('.nav-btn[data-screen="history"]').click();

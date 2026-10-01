@@ -7,7 +7,7 @@
  * Implements the same contract as the real API:
  *   POST /upload-url   { filename }  -> { upload_url, s3_key }
  *   PUT  /s3/<key>     raw bytes     (stands in for the presigned S3 URL)
- *   POST /transcribe   { s3_key }    -> { job_id }
+ *   POST /transcribe   { s3_key, num_speakers? } -> { job_id }
  *   GET  /status/:id                 -> { job_id, status, transcript?, error? }
  *
  * Env:
@@ -63,13 +63,22 @@ function createMockBackend({ delayMs = 4000, fail = false, logger = () => {} } =
         const body = JSON.parse((await readBody(req)).toString() || '{}');
         if (!body.s3_key) return json(res, 422, { detail: 's3_key is required' });
         if (!uploads.has(body.s3_key)) return json(res, 404, { detail: 'No such object in bucket' });
+        // Mirror the real backend's validation: Optional[int], must be a positive integer if present.
+        const hasNumSpeakers = Object.prototype.hasOwnProperty.call(body, 'num_speakers');
+        if (hasNumSpeakers && (!Number.isInteger(body.num_speakers) || body.num_speakers < 1)) {
+          return json(res, 422, { detail: 'num_speakers must be a positive integer' });
+        }
         const jobId = crypto.randomUUID();
         const bytes = uploads.get(body.s3_key).length;
+        const speakersNote = hasNumSpeakers
+          ? `Diarization hint: num_speakers=${body.num_speakers}.`
+          : 'Diarization hint: none (auto-detect).';
         jobs.set(jobId, {
           readyAt: Date.now() + delayMs,
           fail,
+          requestBody: body,
           transcript: [
-            `[mock transcript] Received ${bytes} bytes for ${body.s3_key.split('-').slice(-1)[0]}.`,
+            `[mock transcript] Received ${bytes} bytes for ${body.s3_key.split('-').slice(-1)[0]}. ${speakersNote}`,
             'This is placeholder text produced by the mock backend so you can exercise the app end-to-end without a real transcription service.',
             'Paragraphs are separated by blank lines, mirroring the natural pauses the real service emits.\nA single newline inside a paragraph is preserved too.',
           ].join('\n\n'),
