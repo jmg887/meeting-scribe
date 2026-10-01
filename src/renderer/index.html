@@ -104,10 +104,16 @@
           <p class="muted">Configure where MeetingScribe sends audio for transcription.</p>
         </header>
 
-        <form id="settings-form" class="settings-form">
+        <!-- novalidate: we validate in app.js so errors show inline instead of a native tooltip -->
+        <form id="settings-form" class="settings-form" novalidate>
           <label for="api-base-url">Backend API base URL</label>
           <input id="api-base-url" type="url" placeholder="http://<ec2-ip>:8000" autocomplete="off" spellcheck="false" />
           <p class="muted small">Example: <code>http://54.12.34.56:8000</code>. No trailing slash needed. Saved automatically between launches.</p>
+
+          <label for="num-speakers">Expected number of speakers (optional)</label>
+          <input id="num-speakers" type="number" min="1" max="20" step="1" inputmode="numeric" placeholder="Auto-detect" autocomplete="off" class="input-narrow" />
+          <p class="muted small">Leave blank to auto-detect. Setting this can improve accuracy for meetings with a known number of participants.</p>
+
           <div class="settings-actions">
             <button type="submit" class="btn btn-primary">Save</button>
             <button type="button" id="test-connection-btn" class="btn btn-secondary">Test connection</button>

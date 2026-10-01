@@ -118,3 +118,36 @@ test('ApiClient validates response shapes and http errors', async () => {
   srv.close();
   assert.throws(() => new ApiClient('ftp://x').assertConfigured(), /http/);
 });
+
+test('transcribe body includes num_speakers only when set', () => {
+  assert.deepEqual(ApiClient.transcribeBody('k'), { s3_key: 'k' });
+  assert.deepEqual(ApiClient.transcribeBody('k', {}), { s3_key: 'k' });
+  assert.deepEqual(ApiClient.transcribeBody('k', { numSpeakers: null }), { s3_key: 'k' });
+  assert.deepEqual(ApiClient.transcribeBody('k', { numSpeakers: undefined }), { s3_key: 'k' });
+  assert.deepEqual(ApiClient.transcribeBody('k', { numSpeakers: 0 }), { s3_key: 'k' });
+  assert.deepEqual(ApiClient.transcribeBody('k', { numSpeakers: 3 }), { s3_key: 'k', num_speakers: 3 });
+  // Serialized form must not carry the key at all when unset (no "num_speakers": null)
+  assert.equal(JSON.stringify(ApiClient.transcribeBody('k', { numSpeakers: null })), '{"s3_key":"k"}');
+});
+
+test('pipeline sends num_speakers from settings, omits it when blank', async () => {
+  const { dir, store, backend } = setup();
+  const port = await backend.listen();
+  store.updateSettings({ apiBaseUrl: `http://127.0.0.1:${port}`, numSpeakers: 3 });
+
+  const withHint = store.addRecording({ filePath: makeWav(dir), source: SOURCE.RECORDING });
+  const r1 = await new Pipeline(store, { pollIntervalMs: 50 }).run(withHint.id);
+  assert.equal(r1.status, 'done');
+  assert.deepEqual(backend.jobs.get(r1.jobId).requestBody, { s3_key: r1.s3Key, num_speakers: 3 });
+  assert.match(r1.transcript, /num_speakers=3/);
+
+  store.updateSettings({ numSpeakers: '' });
+  const without = store.addRecording({ filePath: makeWav(dir), source: SOURCE.IMPORT });
+  const r2 = await new Pipeline(store, { pollIntervalMs: 50 }).run(without.id);
+  await backend.close();
+  assert.equal(r2.status, 'done');
+  const body = backend.jobs.get(r2.jobId).requestBody;
+  assert.deepEqual(body, { s3_key: r2.s3Key });
+  assert.equal(Object.prototype.hasOwnProperty.call(body, 'num_speakers'), false, 'key must be absent, not null');
+  assert.match(r2.transcript, /auto-detect/);
+});

@@ -5,7 +5,7 @@
  *
  *   POST {base}/upload-url      { filename }  -> { upload_url, s3_key }
  *   PUT  {upload_url}           raw bytes
- *   POST {base}/transcribe      { s3_key }    -> { job_id }
+ *   POST {base}/transcribe      { s3_key, num_speakers? } -> { job_id }
  *   GET  {base}/status/{job_id}               -> { status, transcript?, error? }
  *
  * Uses the global `fetch` available in Node 18+/Electron. Pure Node so it can
@@ -142,15 +142,31 @@ class ApiClient {
     return { sizeBytes: bytes.length };
   }
 
-  /** @returns {Promise<{job_id:string}>} */
-  async startTranscription(s3Key) {
+  /**
+   * Build the /transcribe request body. `num_speakers` is included only when
+   * it is a positive integer; blank / null / 0 are omitted entirely so the
+   * backend falls back to auto-detection.
+   */
+  static transcribeBody(s3Key, options = {}) {
+    const body = { s3_key: s3Key };
+    const n = options.numSpeakers;
+    if (Number.isInteger(n) && n > 0) body.num_speakers = n;
+    return body;
+  }
+
+  /**
+   * @param {string} s3Key
+   * @param {{numSpeakers?: number|null}} [options]
+   * @returns {Promise<{job_id:string}>}
+   */
+  async startTranscription(s3Key, options = {}) {
     this.assertConfigured();
     const res = await fetchWithTimeout(
       `${this.baseUrl}/transcribe`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ s3_key: s3Key }),
+        body: JSON.stringify(ApiClient.transcribeBody(s3Key, options)),
       },
       DEFAULT_TIMEOUT_MS,
       this.baseUrl,

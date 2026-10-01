@@ -58,3 +58,35 @@ test('corrupt history file is backed up rather than crashing', () => {
   assert.deepEqual(s.listRecordings(), []);
   assert.ok(fs.readdirSync(dir).some((f) => f.startsWith('history.json.corrupt-')));
 });
+
+test('numSpeakers: blank/0/null -> null, integers 1..20 kept, out-of-range rejected, persisted', () => {
+  const { normalizeNumSpeakers } = require('../src/main/store');
+  for (const v of ['', '   ', null, undefined, 0, '0', NaN]) assert.equal(normalizeNumSpeakers(v), null, String(v));
+  assert.equal(normalizeNumSpeakers(1), 1);
+  assert.equal(normalizeNumSpeakers('3'), 3);
+  assert.equal(normalizeNumSpeakers(' 20 '), 20);
+  for (const v of [21, '21', -1, 2.5, '2.5', 'abc', '3e1']) assert.throws(() => normalizeNumSpeakers(v), /whole number|between 1 and 20/, String(v));
+
+  const dir = tmpDir();
+  const a = new Store(dir);
+  assert.equal(a.getSettings().numSpeakers, null);
+  a.updateSettings({ numSpeakers: '4' });
+  assert.equal(a.getSettings().numSpeakers, 4);
+  // Updating only the URL must not clobber the speaker count
+  a.updateSettings({ apiBaseUrl: 'http://x:1' });
+  assert.equal(a.getSettings().numSpeakers, 4);
+  const b = new Store(dir);
+  assert.equal(b.getSettings().numSpeakers, 4, 'persisted across launches');
+  b.updateSettings({ numSpeakers: '' });
+  assert.equal(new Store(dir).getSettings().numSpeakers, null, 'cleared value persists as null');
+  assert.throws(() => b.updateSettings({ numSpeakers: 99 }), /between 1 and 20/);
+  assert.equal(b.getSettings().numSpeakers, null, 'rejected update leaves settings unchanged');
+});
+
+test('numSpeakers: garbage in settings.json is sanitized to null on load', () => {
+  const dir = tmpDir();
+  fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ apiBaseUrl: 'http://x', numSpeakers: 'lots' }));
+  assert.equal(new Store(dir).getSettings().numSpeakers, null);
+  fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ apiBaseUrl: 'http://x', numSpeakers: 500 }));
+  assert.equal(new Store(dir).getSettings().numSpeakers, null);
+});

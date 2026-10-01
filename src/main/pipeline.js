@@ -135,7 +135,7 @@ class Pipeline extends EventEmitter {
       if (!fs.existsSync(rec.filePath)) {
         throw new ApiError('The audio file is missing from disk, so it cannot be uploaded.', 'missing_file');
       }
-      const { apiBaseUrl } = this.store.getSettings();
+      const { apiBaseUrl, numSpeakers } = this.store.getSettings();
       const api = new ApiClient(apiBaseUrl);
       api.assertConfigured();
 
@@ -146,7 +146,8 @@ class Pipeline extends EventEmitter {
       this._update(id, { s3Key, sizeBytes });
 
       // 2. Transcribe
-      const { job_id: jobId } = await api.startTranscription(s3Key);
+      // numSpeakers is an optional diarization hint; omitted from the request when unset.
+      const { job_id: jobId } = await api.startTranscription(s3Key, { numSpeakers });
       this._update(id, { status: STATUS.TRANSCRIBING, jobId });
       const transcript = await api.waitForTranscript(jobId, {
         intervalMs: this.pollIntervalMs,
