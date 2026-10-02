@@ -140,6 +140,17 @@ test/                   Unit tests (node --test)
 electron-builder.yml    Windows NSIS + macOS DMG packaging
 ```
 
+### Visual theme
+
+Warm, calm, minimal. Every colour is a CSS custom property in `:root` at the
+top of `src/renderer/styles.css` (`--bg`, `--surface`, `--text-primary`,
+`--text-secondary`, `--accent`, `--accent-hover`, `--accent-soft`, `--success`,
+`--danger`, `--border`, plus a few derived tones). Component rules never
+hard-code a colour. New panels should use the reusable `.card` class (12px
+radius, 1px `--border`, soft shadow) so they match the existing Record,
+History and Settings surfaces automatically. `--danger` is reserved for
+genuine error states; `--accent` (terracotta) is the primary action colour.
+
 Security posture: `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`,
 strict CSP; the renderer only talks to the main process through the typed
 `window.api` bridge. All network calls happen in the main process.
