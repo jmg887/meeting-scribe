@@ -398,8 +398,8 @@
         disabled: hasTranscript ? undefined : 'true',
         onclick: async () => {
           try {
-            await window.api.transcript.copy(rec.transcript);
-            toast('Transcript copied to clipboard', 'success');
+            await window.api.transcript.copy(rec.id);
+            toast(rec.summary ? 'Summary and transcript copied to clipboard' : 'Transcript copied to clipboard', 'success');
           } catch (err) {
             toast(err.message, 'error');
           }
@@ -468,12 +468,53 @@
     view.appendChild(head);
 
     if (hasTranscript) {
-      view.appendChild(renderTranscriptText(rec.transcript));
+      const body = el('div', { class: 'transcript-body' });
+      const summaryCard = renderSummaryCard(rec);
+      if (summaryCard) body.appendChild(summaryCard);
+      body.appendChild(renderTranscriptText(rec.transcript));
+      view.appendChild(body);
     } else if (rec.status === 'error') {
       view.appendChild(el('div', { class: 'alert alert-error', text: rec.error || 'Transcription failed.' }));
     } else {
       view.appendChild(el('div', { class: 'transcript-pending', text: `${STATUS_LABEL[rec.status] || rec.status}… the transcript will appear here when it is ready.` }));
     }
+  }
+
+  /**
+   * Summary + action items card shown above the transcript.
+   *   summary present            -> "Summary" heading + text (+ "Action Items" checklist if any)
+   *   summary null, error set    -> muted "Summary unavailable" note (raw error never shown)
+   *   summary null, no error     -> returns null (older records; render nothing at all)
+   */
+  function renderSummaryCard(rec) {
+    const summary = typeof rec.summary === 'string' && rec.summary.trim() ? rec.summary.trim() : null;
+    const summaryError = typeof rec.summaryError === 'string' && rec.summaryError.trim() ? rec.summaryError : null;
+    if (!summary && !summaryError) return null;
+
+    const card = el('section', { class: 'card summary-card', 'aria-label': 'Summary' });
+    if (!summary) {
+      card.appendChild(el('div', { class: 'summary-unavailable muted small', text: 'Summary unavailable' }));
+      return card;
+    }
+
+    card.appendChild(el('h3', { class: 'summary-heading', text: 'Summary' }));
+    card.appendChild(el('p', { class: 'summary-text', text: summary }));
+
+    const items = Array.isArray(rec.actionItems)
+      ? rec.actionItems.filter((s) => typeof s === 'string' && s.trim())
+      : [];
+    if (items.length) {
+      card.appendChild(el('h3', { class: 'summary-heading', text: 'Action Items' }));
+      const list = el('ul', { class: 'action-items' });
+      for (const item of items) {
+        list.appendChild(el('li', {}, [
+          el('span', { class: 'action-check', 'aria-hidden': 'true' }),
+          el('span', { class: 'action-text', text: item.trim() }),
+        ]));
+      }
+      card.appendChild(list);
+    }
+    return card;
   }
 
   /**

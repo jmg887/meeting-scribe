@@ -149,13 +149,20 @@ class Pipeline extends EventEmitter {
       // numSpeakers is an optional diarization hint; omitted from the request when unset.
       const { job_id: jobId } = await api.startTranscription(s3Key, { numSpeakers });
       this._update(id, { status: STATUS.TRANSCRIBING, jobId });
-      const transcript = await api.waitForTranscript(jobId, {
+      const result = await api.waitForTranscript(jobId, {
         intervalMs: this.pollIntervalMs,
         signal: controller.signal,
       });
 
       // 3. Done
-      return this._update(id, { status: STATUS.DONE, transcript, error: null });
+      return this._update(id, {
+        status: STATUS.DONE,
+        transcript: result.transcript,
+        summary: result.summary,
+        actionItems: result.actionItems,
+        summaryError: result.summaryError,
+        error: null,
+      });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : `Unexpected error: ${err.message}`;
       return this._update(id, { status: STATUS.ERROR, error: message });
