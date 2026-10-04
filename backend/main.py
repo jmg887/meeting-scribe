@@ -1,5 +1,6 @@
 import os
 import uuid
+import json
 import tempfile
 import subprocess
 from typing import Optional
@@ -19,11 +20,15 @@ WHISPER_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "small")
 WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")
 WHISPER_COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "int8")
 HF_TOKEN = os.environ.get("HF_TOKEN")
+SUMMARY_MODEL_ID = os.environ.get(
+    "SUMMARY_MODEL_ID", "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+)
 PAUSE_THRESHOLD_SECONDS = 1.5
 
 app = FastAPI(title="Meeting Transcription Service")
 
 s3_client = boto3.client("s3", region_name=AWS_REGION, config=Config(signature_version="s3v4"))
+bedrock_client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 
 print(f"Loading Whisper model '{WHISPER_MODEL_SIZE}' on {WHISPER_DEVICE}...")
 model = WhisperModel(WHISPER_MODEL_SIZE, device=WHISPER_DEVICE, compute_type=WHISPER_COMPUTE_TYPE)
@@ -64,6 +69,9 @@ class StatusResponse(BaseModel):
     job_id: str
     status: str
     transcript: Optional[str] = None
+    summary: Optional[str] = None
+    action_items: Optional[list[str]] = None
+    summary_error: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -81,7 +89,10 @@ def get_upload_url(req: UploadUrlRequest):
 @app.post("/transcribe", response_model=TranscribeResponse)
 def start_transcription(req: TranscribeRequest, background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())
-    JOBS[job_id] = {"status": "processing", "transcript": None, "error": None}
+    JOBS[job_id] = {
+        "status": "processing", "transcript": None, "summary": None,
+        "action_items": None, "summary_error": None, "error": None,
+    }
     background_tasks.add_task(run_transcription_job, job_id, req.s3_key, req.num_speakers)
     return TranscribeResponse(job_id=job_id)
 
@@ -101,6 +112,7 @@ def health():
         "model": WHISPER_MODEL_SIZE,
         "device": WHISPER_DEVICE,
         "diarization_enabled": diarization_pipeline is not None,
+        "summary_model": SUMMARY_MODEL_ID,
     }
 
 
@@ -185,6 +197,59 @@ def build_transcript_text(segment_list, turns: list) -> str:
     return "\n\n".join(paragraphs)
 
 
+def generate_summary_and_actions(transcript_text: str):
+    if not transcript_text.strip():
+        return None, [], None
+
+    tool_schema = {
+        "toolSpec": {
+            "name": "record_summary",
+            "description": "Record a concise summary and action items for this meeting/recording transcript.",
+            "inputSchema": {
+                "json": {
+                    "type": "object",
+                    "properties": {
+                        "summary": {
+                            "type": "string",
+                            "description": "A clear 2-4 sentence summary covering the key topics discussed and any decisions made.",
+                        },
+                        "action_items": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Concrete action items, tasks, or follow-ups mentioned. Empty array if none were mentioned.",
+                        },
+                    },
+                    "required": ["summary", "action_items"],
+                }
+            },
+        }
+    }
+
+    prompt = (
+        "Here is a transcript of a recording (may include speaker labels). "
+        "Summarize it and extract any action items.\n\n"
+        f"TRANSCRIPT:\n{transcript_text}"
+    )
+
+    try:
+        response = bedrock_client.converse(
+            modelId=SUMMARY_MODEL_ID,
+            messages=[{"role": "user", "content": [{"text": prompt}]}],
+            toolConfig={
+                "tools": [tool_schema],
+                "toolChoice": {"tool": {"name": "record_summary"}},
+            },
+        )
+        content_blocks = response["output"]["message"]["content"]
+        tool_use = next(b["toolUse"] for b in content_blocks if "toolUse" in b)
+        result = tool_use["input"]
+        summary = result.get("summary", "").strip()
+        action_items = result.get("action_items", []) or []
+        return summary, action_items, None
+    except Exception as exc:
+        return None, [], str(exc)
+
+
 def run_transcription_job(job_id: str, s3_key: str, num_speakers: Optional[int]):
     local_path = None
     diarization_wav_path = None
@@ -204,6 +269,8 @@ def run_transcription_job(job_id: str, s3_key: str, num_speakers: Optional[int])
 
         transcript_text = build_transcript_text(segment_list, turns)
 
+        summary, action_items, summary_error = generate_summary_and_actions(transcript_text)
+
         transcript_key = s3_key.replace("audio/", "transcripts/") + ".txt"
         s3_client.put_object(
             Bucket=S3_BUCKET,
@@ -211,10 +278,28 @@ def run_transcription_job(job_id: str, s3_key: str, num_speakers: Optional[int])
             Body=transcript_text.encode("utf-8"),
         )
 
-        JOBS[job_id] = {"status": "done", "transcript": transcript_text, "error": None}
+        if summary is not None:
+            summary_key = s3_key.replace("audio/", "transcripts/") + ".summary.json"
+            s3_client.put_object(
+                Bucket=S3_BUCKET,
+                Key=summary_key,
+                Body=json.dumps({"summary": summary, "action_items": action_items}).encode("utf-8"),
+            )
+
+        JOBS[job_id] = {
+            "status": "done",
+            "transcript": transcript_text,
+            "summary": summary,
+            "action_items": action_items,
+            "summary_error": summary_error,
+            "error": None,
+        }
 
     except Exception as exc:
-        JOBS[job_id] = {"status": "error", "transcript": None, "error": str(exc)}
+        JOBS[job_id] = {
+            "status": "error", "transcript": None, "summary": None,
+            "action_items": None, "summary_error": None, "error": str(exc),
+        }
 
     finally:
         if local_path and os.path.exists(local_path):
