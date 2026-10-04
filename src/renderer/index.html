@@ -40,7 +40,7 @@
           <p class="muted">Record from your microphone or import an existing audio file. It will be uploaded and transcribed automatically.</p>
         </header>
 
-        <div class="record-panel">
+        <div class="card record-panel">
           <div id="timer" class="timer">00:00</div>
           <div id="level-meter" class="level-meter"><div id="level-bar"></div></div>
 
@@ -56,7 +56,7 @@
           <p class="muted small">Supported imports: <span id="supported-formats">.wav, .mp3, .m4a, .ogg, .flac, .aac, .opus</span> — or drop a file anywhere on this screen.</p>
         </div>
 
-        <div id="status-card" class="status-card hidden">
+        <div id="status-card" class="card status-card hidden">
           <div class="status-card-head">
             <span id="status-name" class="status-name"></span>
             <span id="status-source" class="tag"></span>
@@ -87,11 +87,11 @@
         </header>
 
         <div class="history-layout">
-          <div id="history-list" class="history-list">
+          <div id="history-list" class="card history-list">
             <div class="empty">No recordings yet.</div>
           </div>
 
-          <div id="transcript-view" class="transcript-view">
+          <div id="transcript-view" class="card transcript-view">
             <div class="empty">Select a recording to view its transcript.</div>
           </div>
         </div>
@@ -105,7 +105,7 @@
         </header>
 
         <!-- novalidate: we validate in app.js so errors show inline instead of a native tooltip -->
-        <form id="settings-form" class="settings-form" novalidate>
+        <form id="settings-form" class="card settings-form" novalidate>
           <label for="api-base-url">Backend API base URL</label>
           <input id="api-base-url" type="url" placeholder="http://<ec2-ip>:8000" autocomplete="off" spellcheck="false" />
           <p class="muted small">Example: <code>http://54.12.34.56:8000</code>. No trailing slash needed. Saved automatically between launches.</p>

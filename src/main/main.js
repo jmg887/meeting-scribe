@@ -82,7 +82,7 @@ function createWindow() {
     minHeight: 520,
     title: 'MeetingScribe',
     icon: path.join(__dirname, '..', '..', 'build', 'icon.png'),
-    backgroundColor: '#f6f7fb',
+    backgroundColor: '#FAF7F2', // matches --bg in styles.css (avoids a white flash before first paint)
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
