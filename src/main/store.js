@@ -170,6 +170,11 @@ class Store {
       s3Key: null,
       jobId: null,
       transcript: null,
+      // Populated from /status once done. Older records lack these keys entirely;
+      // the renderer treats missing/null summary + null summaryError as "nothing to show".
+      summary: null,
+      actionItems: [],
+      summaryError: null,
       error: null,
     };
     this._recordings.push(rec);
@@ -185,6 +190,9 @@ class Store {
       's3Key',
       'jobId',
       'transcript',
+      'summary',
+      'actionItems',
+      'summaryError',
       'error',
       'durationSec',
       'sizeBytes',

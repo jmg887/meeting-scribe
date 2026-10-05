@@ -41,7 +41,7 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
   transcript: {
-    copy: (text) => call('transcript:copy', text),
+    copy: (id) => call('transcript:copy', { id }),
     readClipboard: () => call('transcript:readClipboard'),
     export: (id) => call('transcript:export', { id }),
   },

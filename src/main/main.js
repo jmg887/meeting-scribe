@@ -14,6 +14,7 @@ const {
   supportedExtensionsLabel,
 } = require('./pipeline');
 const { ApiClient } = require('./api');
+const { formatTranscriptExport } = require('./format');
 
 let mainWindow = null;
 let store = null;
@@ -192,8 +193,12 @@ function registerIpc() {
   }));
 
   // Transcript actions
-  ipcMain.handle('transcript:copy', safe((_e, text) => {
-    clipboard.writeText(text || ''); // verbatim: paragraph breaks are preserved
+  // Copy and Export share one formatter so the clipboard and the .txt file are
+  // always identical (summary + action items prepended when a summary exists).
+  ipcMain.handle('transcript:copy', safe((_e, { id }) => {
+    const rec = store.getRecording(id);
+    if (!rec || typeof rec.transcript !== 'string') throw new Error('No transcript to copy.');
+    clipboard.writeText(formatTranscriptExport(rec)); // verbatim: paragraph breaks are preserved
     return true;
   }));
   ipcMain.handle('transcript:readClipboard', safe(() => clipboard.readText()));
@@ -207,7 +212,7 @@ function registerIpc() {
       filters: [{ name: 'Text', extensions: ['txt'] }],
     });
     if (result.canceled || !result.filePath) return null;
-    await fsp.writeFile(result.filePath, rec.transcript, 'utf8');
+    await fsp.writeFile(result.filePath, formatTranscriptExport(rec), 'utf8');
     return result.filePath;
   }));
 

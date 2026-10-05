@@ -6,7 +6,8 @@
  *   POST {base}/upload-url      { filename }  -> { upload_url, s3_key }
  *   PUT  {upload_url}           raw bytes
  *   POST {base}/transcribe      { s3_key, num_speakers? } -> { job_id }
- *   GET  {base}/status/{job_id}               -> { status, transcript?, error? }
+ *   GET  {base}/status/{job_id}               -> { status, transcript?, error?,
+ *                                                 summary?, action_items?, summary_error? }
  *
  * Uses the global `fetch` available in Node 18+/Electron. Pure Node so it can
  * be unit-tested against the mock backend in scripts/mock-backend.js.
@@ -195,6 +196,22 @@ class ApiClient {
   }
 
   /**
+   * Normalise the optional summary fields of a `done` status payload.
+   * Tolerates older backends that omit them entirely.
+   *   summary       -> string | null
+   *   actionItems   -> string[] (never null; non-string entries dropped)
+   *   summaryError  -> string | null
+   */
+  static summaryFromStatus(data) {
+    const summary = typeof data.summary === 'string' && data.summary.trim() ? data.summary : null;
+    const actionItems = Array.isArray(data.action_items)
+      ? data.action_items.filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim())
+      : [];
+    const summaryError = typeof data.summary_error === 'string' && data.summary_error.trim() ? data.summary_error : null;
+    return { summary, actionItems, summaryError };
+  }
+
+  /**
    * Poll /status until done or error.
    * @param {string} jobId
    * @param {object} [opts]
@@ -203,6 +220,7 @@ class ApiClient {
    * @param {number} [opts.maxConsecutiveFailures=5] tolerate transient poll failures
    * @param {(status:object)=>void} [opts.onPoll]
    * @param {AbortSignal} [opts.signal]
+   * @returns {Promise<{transcript:string, summary:string|null, actionItems:string[], summaryError:string|null}>}
    */
   async waitForTranscript(jobId, opts = {}) {
     const intervalMs = opts.intervalMs ?? 3000;
@@ -229,7 +247,10 @@ class ApiClient {
       if (opts.onPoll) opts.onPoll(data);
 
       if (data.status === 'done') {
-        return typeof data.transcript === 'string' ? data.transcript : '';
+        return {
+          transcript: typeof data.transcript === 'string' ? data.transcript : '',
+          ...ApiClient.summaryFromStatus(data),
+        };
       }
       if (data.status === 'error') {
         throw new ApiError(

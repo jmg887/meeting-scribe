@@ -15,6 +15,13 @@
  *   MOCK_DELAY_MS     how long a job stays "processing" (default 4000)
  *   MOCK_FAIL         set to "1" to make every job end in status "error"
  *
+ * Summary fields on a "done" status are chosen per job from the uploaded
+ * filename so tests can hit every branch:
+ *   name contains "nosummary"   -> summary: null, summary_error: "<reason>", action_items: []
+ *   name contains "noactions"   -> summary present, action_items: []
+ *   name contains "legacy"      -> summary/action_items/summary_error omitted entirely (old backend)
+ *   otherwise                   -> summary + two action items
+ *
  * Also exported as createMockBackend() for programmatic use in tests.
  */
 
@@ -77,6 +84,9 @@ function createMockBackend({ delayMs = 4000, fail = false, logger = () => {} } =
           readyAt: Date.now() + delayMs,
           fail,
           requestBody: body,
+          summaryMode: /nosummary/i.test(body.s3_key) ? 'error'
+            : /noactions/i.test(body.s3_key) ? 'noactions'
+              : /legacy/i.test(body.s3_key) ? 'legacy' : 'full',
           transcript: [
             `[mock transcript] Received ${bytes} bytes for ${body.s3_key.split('-').slice(-1)[0]}. ${speakersNote}`,
             'This is placeholder text produced by the mock backend so you can exercise the app end-to-end without a real transcription service.',
@@ -92,7 +102,18 @@ function createMockBackend({ delayMs = 4000, fail = false, logger = () => {} } =
         if (!job) return json(res, 404, { detail: 'job not found' });
         if (Date.now() < job.readyAt) return json(res, 200, { job_id: jobId, status: 'processing' });
         if (job.fail) return json(res, 200, { job_id: jobId, status: 'error', error: 'Mock transcription failure (MOCK_FAIL=1)' });
-        return json(res, 200, { job_id: jobId, status: 'done', transcript: job.transcript });
+        const done = { job_id: jobId, status: 'done', transcript: job.transcript, error: null };
+        if (job.summaryMode === 'legacy') return json(res, 200, done);
+        if (job.summaryMode === 'error') {
+          return json(res, 200, { ...done, summary: null, action_items: [], summary_error: 'Mock summary model timed out' });
+        }
+        done.summary = 'The team reviewed the mock recording pipeline and confirmed uploads, transcription and polling all behave as expected. Two follow-ups were agreed.';
+        done.action_items = job.summaryMode === 'noactions' ? [] : [
+          'Verify the summary card renders above the transcript',
+          'Confirm Copy and Export include the summary header',
+        ];
+        done.summary_error = null;
+        return json(res, 200, done);
       }
 
       return json(res, 404, { detail: 'Not found' });

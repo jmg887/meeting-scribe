@@ -119,9 +119,40 @@
     step('history.sourceTags', tags.includes('Imported') && tags.includes('Recorded'), tags.join(','));
 
     // Copy to clipboard must use the stored text verbatim (paragraph breaks intact)
-    await window.api.transcript.copy(stored);
+    // The 'nosummary-*.ogg' import -> backend reported summary_error -> card shows the muted note only
+    const allRecs = await window.api.recordings.list();
+    const noSumRec = allRecs.find((r) => /nosummary/.test(r.originalName));
+    const noSumItem = Array.from(items).find((li) => li.dataset.id === (noSumRec && noSumRec.id));
+    if (noSumItem) { noSumItem.click(); await sleep(150); }
+    await window.api.transcript.copy(noSumRec.id);
     const clip = await window.api.transcript.readClipboard();
-    step('transcript.copy', clip === stored && clip.includes('\n\n'), clip.length);
+    step('transcript.copy.noSummary', !!noSumRec && noSumRec.summary === null && !!noSumRec.summaryError
+      && clip === noSumRec.transcript && !clip.includes('SUMMARY:') && !clip.includes('TRANSCRIPT:'), clip.length);
+
+    // Summary card states in the detail view
+    step('summary.unavailable', !!document.querySelector('.summary-card .summary-unavailable')
+      && document.querySelector('.summary-card').textContent.trim() === 'Summary unavailable'
+      && !document.querySelector('.summary-heading')
+      && !/timed out/.test(document.querySelector('#transcript-view').textContent), 'raw error must not leak');
+
+    // Select the live recording (last item) -> full summary + 2 action items
+    items[items.length - 1].click();
+    await sleep(150);
+    const sc = document.querySelector('.summary-card');
+    const heads = Array.from(document.querySelectorAll('.summary-heading')).map((h) => h.textContent);
+    const actionTexts = Array.from(document.querySelectorAll('.action-items li .action-text')).map((n) => n.textContent);
+    step('summary.card', !!sc && heads.join('|') === 'Summary|Action Items'
+      && /reviewed the mock recording pipeline/.test(sc.querySelector('.summary-text').textContent), heads.join('|'));
+    step('summary.actionItems', actionTexts.length === 2 && document.querySelectorAll('.action-check').length === 2, actionTexts.join(' / '));
+    step('summary.aboveTranscript', !!sc && sc.nextElementSibling && sc.nextElementSibling.classList.contains('transcript-text'));
+
+    const liveRec = await window.api.recordings.get(state0(items[items.length - 1]));
+    await window.api.transcript.copy(liveRec.id);
+    const clip2 = await window.api.transcript.readClipboard();
+    const expected = `SUMMARY:\n${liveRec.summary}\n\nACTION ITEMS:\n- ${liveRec.actionItems[0]}\n- ${liveRec.actionItems[1]}\n\nTRANSCRIPT:\n${liveRec.transcript}`;
+    step('transcript.copy.withSummary', clip2 === expected, clip2.slice(0, 60));
+    items[0].click();
+    await sleep(100);
 
     // Error path: point at dead backend, retry -> error status + retry button
     await window.api.settings.update({ apiBaseUrl: 'http://127.0.0.1:1' });

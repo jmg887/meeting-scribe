@@ -16,8 +16,8 @@ grep -q "listening" "$DATA/backend.log" || { echo "Mock backend failed to start:
 export MEETINGSCRIBE_USER_DATA="$DATA" MEETINGSCRIBE_FAKE_MIC=1 MEETINGSCRIBE_SMOKE=1
 export MEETINGSCRIBE_SMOKE_SCRIPT="$PWD/scripts/smoke-renderer.js"
 # Tiny valid WAV saved under an .ogg name: exercises extension validation for a newly supported format.
-node -e "const b=Buffer.alloc(44+3200);b.write('RIFF',0);b.writeUInt32LE(36+3200,4);b.write('WAVE',8);b.write('fmt ',12);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(16000,24);b.writeUInt32LE(32000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(3200,40);require('fs').writeFileSync(process.argv[1],b)" "$DATA/sample.ogg"
-export MEETINGSCRIBE_SMOKE_OGG_PATH="$DATA/sample.ogg"
+node -e "const b=Buffer.alloc(44+3200);b.write('RIFF',0);b.writeUInt32LE(36+3200,4);b.write('WAVE',8);b.write('fmt ',12);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(16000,24);b.writeUInt32LE(32000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(3200,40);require('fs').writeFileSync(process.argv[1],b)" "$DATA/nosummary-sample.ogg"
+export MEETINGSCRIBE_SMOKE_OGG_PATH="$DATA/nosummary-sample.ogg"
 RUNNER=""
 if ! [ -n "${DISPLAY:-}" ] && command -v xvfb-run >/dev/null; then RUNNER="xvfb-run -a"; fi
 # Usage: scripts/smoke.sh [path-to-packaged-binary]   (defaults to running from source)
