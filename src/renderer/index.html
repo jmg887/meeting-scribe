@@ -8,6 +8,33 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- Single stroke-based icon set (Lucide-style, 24px viewBox). Referenced via <use href="#i-…">. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+      <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></symbol>
+      <symbol id="i-back10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><text x="12" y="15.5" text-anchor="middle" font-size="7" font-weight="700" fill="currentColor" stroke="none">10</text></symbol>
+      <symbol id="i-fwd10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/><text x="12" y="15.5" text-anchor="middle" font-size="7" font-weight="700" fill="currentColor" stroke="none">10</text></symbol>
+      <symbol id="i-chev-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></symbol>
+      <symbol id="i-chev-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol>
+    </defs>
+  </svg>
+
   <div id="app">
     <nav class="sidebar">
       <div class="brand">
@@ -15,20 +42,20 @@
         <span>MeetingScribe</span>
       </div>
       <button class="nav-btn active" data-screen="home">
-        <span class="nav-icon">●</span> Record
+        <svg class="icon"><use href="#i-mic"/></svg> Record
       </button>
       <button class="nav-btn" data-screen="history">
-        <span class="nav-icon">☰</span> History
+        <svg class="icon"><use href="#i-history"/></svg> History
         <span id="history-badge" class="badge hidden">0</span>
       </button>
       <button class="nav-btn" data-screen="settings">
-        <span class="nav-icon">⚙</span> Settings
+        <svg class="icon"><use href="#i-settings"/></svg> Settings
       </button>
       <div class="sidebar-footer">
-        <div id="backend-indicator" class="backend-indicator">
-          <span class="dot"></span><span class="label">No backend set</span>
-        </div>
-        <div id="app-version" class="muted small"></div>
+        <!-- Quiet connection status: a dot + short label; full URL lives in the tooltip and Settings. -->
+        <button id="backend-indicator" class="backend-indicator" type="button" title="Backend connection" data-screen="settings">
+          <span class="dot"></span><span class="label">Not connected</span>
+        </button>
       </div>
     </nav>
 
@@ -50,16 +77,19 @@
               <span class="record-label">Record</span>
             </button>
             <button id="import-btn" class="btn btn-secondary btn-large" title="Import an existing audio file">
-              Import Audio File
+              <svg class="icon"><use href="#i-upload"/></svg> Import Audio File
             </button>
           </div>
-          <p class="muted small">Supported imports: <span id="supported-formats">.wav, .mp3, .m4a, .ogg, .flac, .aac, .opus</span> — or drop a file anywhere on this screen.</p>
+          <p class="hint">Supported imports: <span id="supported-formats">.wav, .mp3, .m4a, .ogg, .flac, .aac, .opus</span> — or drop a file anywhere on this screen.</p>
         </div>
 
         <div id="status-card" class="card status-card hidden">
+          <button id="status-dismiss-btn" class="icon-btn status-dismiss" type="button" title="Dismiss" aria-label="Dismiss">
+            <svg class="icon"><use href="#i-x"/></svg>
+          </button>
           <div class="status-card-head">
+            <svg id="status-source-icon" class="icon source-icon" aria-hidden="true"><use href="#i-mic"/></svg>
             <span id="status-name" class="status-name"></span>
-            <span id="status-source" class="tag"></span>
           </div>
           <ol class="steps">
             <li data-step="uploading"><span class="step-dot"></span>Uploading</li>
@@ -69,7 +99,7 @@
           <div id="status-message" class="status-message"></div>
           <div class="status-actions">
             <button id="status-view-btn" class="btn btn-primary hidden">View transcript</button>
-            <button id="status-retry-btn" class="btn btn-secondary hidden">Retry</button>
+            <button id="status-retry-btn" class="btn btn-secondary hidden"><svg class="icon"><use href="#i-refresh"/></svg> Retry</button>
           </div>
         </div>
 
@@ -78,17 +108,23 @@
 
       <!-- ================================ HISTORY ================================ -->
       <section id="screen-history" class="screen">
-        <header class="screen-header row">
-          <div>
-            <h1>History</h1>
-            <p class="muted">Past recordings and imports. Transcripts are stored locally and available offline.</p>
-          </div>
-          <button id="open-folder-btn" class="btn btn-secondary">Open recordings folder</button>
+        <header class="screen-header">
+          <h1>History</h1>
+          <p class="muted">Past recordings and imports. Transcripts are stored locally and available offline.</p>
         </header>
 
         <div class="history-layout">
-          <div id="history-list" class="card history-list">
-            <div class="empty">No recordings yet.</div>
+          <div class="history-pane">
+            <label class="search-field" for="history-search">
+              <svg class="icon"><use href="#i-search"/></svg>
+              <input id="history-search" type="search" placeholder="Search titles and transcripts" autocomplete="off" spellcheck="false" />
+              <button id="history-search-clear" class="icon-btn hidden" type="button" title="Clear search" aria-label="Clear search">
+                <svg class="icon"><use href="#i-x"/></svg>
+              </button>
+            </label>
+            <div id="history-list" class="card history-list">
+              <div class="empty">No recordings yet.</div>
+            </div>
           </div>
 
           <div id="transcript-view" class="card transcript-view">
@@ -101,29 +137,53 @@
       <section id="screen-settings" class="screen">
         <header class="screen-header">
           <h1>Settings</h1>
-          <p class="muted">Configure where MeetingScribe sends audio for transcription.</p>
+          <p class="muted">Changes are saved automatically.</p>
         </header>
 
-        <!-- novalidate: we validate in app.js so errors show inline instead of a native tooltip -->
-        <form id="settings-form" class="card settings-form" novalidate>
-          <label for="api-base-url">Backend API base URL</label>
-          <input id="api-base-url" type="url" placeholder="http://<ec2-ip>:8000" autocomplete="off" spellcheck="false" />
-          <p class="muted small">Example: <code>http://54.12.34.56:8000</code>. No trailing slash needed. Saved automatically between launches.</p>
+        <!-- novalidate: validation is in app.js so errors show inline instead of a native tooltip -->
+        <form id="settings-form" class="settings-stack" novalidate>
+          <section class="card settings-group">
+            <h2 class="settings-group-title">Server</h2>
+            <div class="field">
+              <label for="api-base-url">Backend API base URL</label>
+              <input id="api-base-url" type="url" placeholder="http://<ec2-ip>:8000" autocomplete="off" spellcheck="false" />
+              <p class="hint">Example: <code>http://54.12.34.56:8000</code>. No trailing slash needed.</p>
+            </div>
+            <div class="field-row">
+              <button type="button" id="test-connection-btn" class="btn btn-secondary">Test connection</button>
+              <span id="connection-status" class="field-status" aria-live="polite"></span>
+            </div>
+          </section>
 
-          <label for="num-speakers">Expected number of speakers (optional)</label>
-          <input id="num-speakers" type="number" min="1" max="20" step="1" inputmode="numeric" placeholder="Auto-detect" autocomplete="off" class="input-narrow" />
-          <p class="muted small">Leave blank to auto-detect. Setting this can improve accuracy for meetings with a known number of participants.</p>
+          <section class="card settings-group">
+            <h2 class="settings-group-title">Transcription</h2>
+            <div class="field">
+              <label for="num-speakers">Expected number of speakers (optional)</label>
+              <input id="num-speakers" type="number" min="1" max="20" step="1" inputmode="numeric" placeholder="Auto-detect" autocomplete="off" class="input-narrow" />
+              <p class="hint">Leave blank to auto-detect. Setting this can improve accuracy for meetings with a known number of participants.</p>
+            </div>
+          </section>
 
-          <div class="settings-actions">
-            <button type="submit" class="btn btn-primary">Save</button>
-            <button type="button" id="test-connection-btn" class="btn btn-secondary">Test connection</button>
-            <span id="settings-status" class="muted small"></span>
-          </div>
+          <section class="card settings-group">
+            <h2 class="settings-group-title">Storage</h2>
+            <div class="field">
+              <label>Data folder</label>
+              <div class="field-row">
+                <code id="data-dir" class="path"></code>
+                <button type="button" id="open-folder-btn" class="btn btn-secondary btn-small">
+                  <svg class="icon"><use href="#i-folder"/></svg> Open
+                </button>
+              </div>
+              <p class="hint">Recordings, transcripts and settings are stored here.</p>
+            </div>
+          </section>
+
+          <section class="card settings-group">
+            <h2 class="settings-group-title">About</h2>
+            <p class="hint">MeetingScribe <span id="app-version"></span></p>
+          </section>
+          <span id="settings-status" class="field-status settings-saved" aria-live="polite"></span>
         </form>
-
-        <div class="settings-info muted small">
-          <div>Data folder: <code id="data-dir"></code></div>
-        </div>
       </section>
     </main>
   </div>
@@ -131,6 +191,7 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="wav-recorder.js"></script>
+  <script src="history.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

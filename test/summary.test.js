@@ -37,7 +37,11 @@ test('formatTranscriptExport: summary + action items -> exact layout', () => {
     summary: 'We met.',
     actionItems: ['Do A', '  Do B  ', '', 42],
   });
-  assert.equal(out, 'SUMMARY:\nWe met.\n\nACTION ITEMS:\n- Do A\n- Do B\n\nTRANSCRIPT:\nHello.\n\nWorld.');
+  assert.equal(out, 'SUMMARY:\nWe met.\n\nACTION ITEMS:\n- [ ] Do A\n- [ ] Do B\n\nTRANSCRIPT:\nHello.\n\nWorld.');
+
+  // Ticked items render as [x]; indices refer to the raw actionItems array.
+  const ticked = formatTranscriptExport({ transcript: 'T', summary: 'S', actionItems: ['A', 'B', 'C'], checkedActionItems: [0, 2] });
+  assert.equal(ticked, 'SUMMARY:\nS\n\nACTION ITEMS:\n- [x] A\n- [ ] B\n- [x] C\n\nTRANSCRIPT:\nT');
 });
 
 test('formatTranscriptExport: summary without action items omits ACTION ITEMS block', () => {
@@ -80,7 +84,7 @@ test('pipeline persists summary, action items and summary error from /status', a
     'Confirm Copy and Export include the summary header',
   ]);
   assert.equal(full.summaryError, null);
-  assert.match(formatTranscriptExport(full), /^SUMMARY:\n.+\n\nACTION ITEMS:\n- Verify.+\n- Confirm.+\n\nTRANSCRIPT:\n\[mock transcript\]/s);
+  assert.match(formatTranscriptExport(full), /^SUMMARY:\n.+\n\nACTION ITEMS:\n- \[ \] Verify.+\n- \[ \] Confirm.+\n\nTRANSCRIPT:\nSpeaker 1: \[mock transcript\]/s);
 
   const noActions = await runJob('noactions.wav');
   assert.ok(noActions.summary);

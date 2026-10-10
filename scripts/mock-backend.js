@@ -87,10 +87,11 @@ function createMockBackend({ delayMs = 4000, fail = false, logger = () => {} } =
           summaryMode: /nosummary/i.test(body.s3_key) ? 'error'
             : /noactions/i.test(body.s3_key) ? 'noactions'
               : /legacy/i.test(body.s3_key) ? 'legacy' : 'full',
+          // Mirrors the real backend: each paragraph is "Speaker N: text", separated by blank lines.
           transcript: [
-            `[mock transcript] Received ${bytes} bytes for ${body.s3_key.split('-').slice(-1)[0]}. ${speakersNote}`,
-            'This is placeholder text produced by the mock backend so you can exercise the app end-to-end without a real transcription service.',
-            'Paragraphs are separated by blank lines, mirroring the natural pauses the real service emits.\nA single newline inside a paragraph is preserved too.',
+            `Speaker 1: [mock transcript] Received ${bytes} bytes for ${body.s3_key.split('-').slice(-1)[0]}. ${speakersNote}`,
+            'Speaker 2: This is placeholder text produced by the mock backend so you can exercise the app end-to-end without a real transcription service.',
+            'Speaker 1: Paragraphs are separated by blank lines, mirroring the natural pauses the real service emits.\nA single newline inside a paragraph is preserved too.',
           ].join('\n\n'),
         });
         return json(res, 200, { job_id: jobId });

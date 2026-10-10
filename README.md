@@ -13,7 +13,7 @@ local, offline-readable history.
 | --- | --- |
 | **Record** | Big record/stop button with a live timer and level meter. On stop, audio is saved locally as a 16 kHz mono 16-bit PCM `.wav`, then the upload → transcribe flow starts automatically. `Import Audio File` opens a native picker (`.wav`, `.mp3`, `.m4a`, `.ogg`, `.flac`, `.aac`, `.opus`) and runs the same flow. Drag-and-drop onto the panel also works. A status card shows **Uploading → Transcribing → Done** (or an error with a Retry button). |
 | **History** | Every recording/import with date, duration, source (Recorded / Imported) and status. Click one to read the transcript; paragraph breaks (`\n\n`) from the backend are rendered as separate paragraphs. When the backend returns a **summary** it appears in a card above the transcript, with **action items** as a checklist when present; a failed summary shows a muted "Summary unavailable" note without affecting the transcript. **Copy** and **Export .txt** prepend `SUMMARY:` / `ACTION ITEMS:` / `TRANSCRIPT:` sections when a summary exists, otherwise they emit the transcript verbatim. Also Show file, Delete, and Retry for failed jobs. Works offline for stored transcripts. |
-| **Settings** | Backend API base URL (e.g. `http://<ec2-ip>:8000`), persisted between launches, plus a "Test connection" button. Optional **Expected number of speakers** (1–20, blank = auto-detect) — a diarization hint sent as `num_speakers` on `/transcribe`. |
+| **Settings** | Grouped into Server / Transcription / Storage / About and **auto-saved on blur** (no Save button). Backend API base URL with "Test connection"; optional **Expected number of speakers** (1–20, blank = auto-detect) sent as `num_speakers` on `/transcribe`; data-folder path with an Open button; app version. |
 
 ## Backend contract
 
@@ -107,7 +107,7 @@ All data is stored in Electron's per-user `userData` directory:
 | macOS | `~/Library/Application Support/MeetingScribe/` |
 
 - `settings.json` — `{ "apiBaseUrl": "...", "numSpeakers": 3 | null }`
-- `history.json` — array of recordings with status, transcript, summary / action items / summary error, S3 key, job id
+- `history.json` — array of recordings with status, transcript, summary / action items / summary error, user edits (`title`, `speakerNames`, `checkedActionItems`), S3 key, job id
 - `recordings/` — the `.wav` files you recorded and copies of imported files
 
 Files are written atomically (temp file + rename); a corrupt `history.json` is
@@ -136,12 +136,22 @@ src/main/store.js       JSON persistence for settings + history (atomic writes)
 src/main/api.js         Backend REST client with friendly error mapping
 src/main/pipeline.js    upload -> transcribe -> poll state machine, emits progress
 src/main/format.js      plain-text export/copy formatter (summary + action items + transcript)
-src/renderer/           index.html, styles.css, app.js (screens), wav-recorder.js, pcm-worklet.js
+src/renderer/           index.html (incl. SVG icon sprite), styles.css, app.js (record/settings),
+                        history.js (list, transcript reader, find, player), wav-recorder.js, pcm-worklet.js
 scripts/mock-backend.js Mock API server for development/tests
 scripts/smoke.sh        Headless end-to-end test
 test/                   Unit tests (node --test)
 electron-builder.yml    Windows NSIS + macOS DMG packaging
 ```
+
+### Transcript format expectations
+
+The reader splits the stored transcript on blank lines and treats a leading
+`Speaker N: ` on a paragraph as the speaker label (this is what `backend/main.py`
+emits). Paragraphs without a label render as plain turns, so transcripts from
+other sources still display. Renames are stored as `{ "Speaker 1": "James" }`
+on the record and applied at render/export time; the stored transcript text is
+never rewritten.
 
 ### Visual theme
 

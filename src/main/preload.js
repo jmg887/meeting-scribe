@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id) => call('recordings:delete', id),
     retry: (id) => call('recordings:retry', id),
     setDuration: (id, durationSec) => call('recordings:setDuration', { id, durationSec }),
+    /** Persist user edits: { title?, speakerNames?, checkedActionItems? } */
+    updateMeta: (id, patch) => call('recordings:updateMeta', { id, patch }),
     saveWav: (buffer, durationSec) => call('recordings:saveWav', { buffer, durationSec }),
     import: (durationSec) => call('recordings:import', { durationSec }),
     importPath: (filePath, durationSec) => call('recordings:importPath', { filePath, durationSec }),
