@@ -84,6 +84,9 @@ function createWindow() {
     title: 'MeetingScribe',
     icon: path.join(__dirname, '..', '..', 'build', 'icon.png'),
     backgroundColor: '#FAF7F2', // matches --bg in styles.css (avoids a white flash before first paint)
+    // The stock File/Edit/View menu adds nothing for this app and clashes with the
+    // custom chrome. Hidden (not removed) so Alt still reveals it and shortcuts work.
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -139,6 +142,11 @@ function registerIpc() {
   ipcMain.handle('recordings:setDuration', safe((_e, { id, durationSec }) => {
     if (!Number.isFinite(durationSec)) throw new Error('Invalid duration.');
     return store.updateRecording(id, { durationSec });
+  }));
+  ipcMain.handle('recordings:updateMeta', safe((_e, { id, patch }) => {
+    const rec = store.updateRecordingMeta(id, patch);
+    if (!rec) throw new Error('Recording not found.');
+    return rec;
   }));
   ipcMain.handle('recordings:retry', safe((_e, id) => {
     const rec = store.getRecording(id);

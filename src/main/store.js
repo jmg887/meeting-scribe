@@ -163,6 +163,8 @@ class Store {
       updatedAt: now,
       source: data.source === SOURCE.IMPORT ? SOURCE.IMPORT : SOURCE.RECORDING,
       originalName: data.originalName || path.basename(data.filePath),
+      /** User-editable display title; null => fall back to originalName. */
+      title: null,
       filePath: data.filePath,
       sizeBytes: Number.isFinite(data.sizeBytes) ? data.sizeBytes : null,
       durationSec: Number.isFinite(data.durationSec) ? data.durationSec : null,
@@ -175,6 +177,10 @@ class Store {
       summary: null,
       actionItems: [],
       summaryError: null,
+      /** Indices into actionItems the user has ticked off. */
+      checkedActionItems: [],
+      /** { "Speaker 1": "James", ... } — display-name overrides for diarised labels. */
+      speakerNames: {},
       error: null,
     };
     this._recordings.push(rec);
@@ -193,6 +199,9 @@ class Store {
       'summary',
       'actionItems',
       'summaryError',
+      'checkedActionItems',
+      'speakerNames',
+      'title',
       'error',
       'durationSec',
       'sizeBytes',
@@ -208,6 +217,41 @@ class Store {
     this._recordings[idx] = next;
     this._flushHistory();
     return { ...next };
+  }
+
+  /**
+   * Apply user edits (title, speaker names, ticked action items) with
+   * validation so malformed renderer input can never corrupt history.json.
+   */
+  updateRecordingMeta(id, patch) {
+    const rec = this.getRecording(id);
+    if (!rec) return null;
+    const next = {};
+    if (patch && Object.prototype.hasOwnProperty.call(patch, 'title')) {
+      const t = typeof patch.title === 'string' ? patch.title.trim().slice(0, 200) : '';
+      next.title = t || null;
+    }
+    if (patch && Object.prototype.hasOwnProperty.call(patch, 'speakerNames')) {
+      const out = {};
+      if (patch.speakerNames && typeof patch.speakerNames === 'object') {
+        for (const [k, v] of Object.entries(patch.speakerNames)) {
+          if (typeof k !== 'string' || typeof v !== 'string') continue;
+          const name = v.trim().slice(0, 80);
+          if (name && name !== k) out[k] = name;
+        }
+      }
+      next.speakerNames = out;
+    }
+    if (patch && Object.prototype.hasOwnProperty.call(patch, 'checkedActionItems')) {
+      const max = Array.isArray(rec.actionItems) ? rec.actionItems.length : 0;
+      const seen = new Set();
+      const arr = Array.isArray(patch.checkedActionItems) ? patch.checkedActionItems : [];
+      for (const i of arr) {
+        if (Number.isInteger(i) && i >= 0 && i < max) seen.add(i);
+      }
+      next.checkedActionItems = [...seen].sort((a, b) => a - b);
+    }
+    return this.updateRecording(id, next);
   }
 
   deleteRecording(id, { deleteFile = true } = {}) {

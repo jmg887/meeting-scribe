@@ -1,4 +1,5 @@
-/* MeetingScribe renderer — screens, recording, status, history, settings. */
+/* MeetingScribe renderer — screens, recording, status, settings.
+   The History screen (list, transcript reader, player) lives in history.js. */
 (function () {
   'use strict';
 
@@ -12,16 +13,23 @@
     selectedId: null,
     /** id of the recording currently shown in the home status card */
     activeId: null,
-    settings: { apiBaseUrl: '' },
+    settings: { apiBaseUrl: '', numSpeakers: null },
     busy: false, // import/save in progress (not the pipeline itself)
+    /** history search query (matches title + transcript + summary) */
+    query: '',
+    /** find-in-transcript */
+    find: { open: false, query: '', index: 0 },
+    /** inline editors currently open, so re-renders don't clobber them */
+    editing: { title: false, speaker: null },
   };
 
   const recorder = new WavRecorder({ onLevel: updateLevel });
   let timerInterval = null;
 
   // ------------------------------------------------------------ utils
+  /** mm:ss or h:mm:ss; null when unknown (callers decide how to show "unknown"). */
   function formatDuration(sec) {
-    if (!Number.isFinite(sec) || sec < 0) return '--:--';
+    if (!Number.isFinite(sec) || sec < 0) return null;
     const s = Math.floor(sec % 60);
     const m = Math.floor((sec / 60) % 60);
     const h = Math.floor(sec / 3600);
@@ -29,11 +37,12 @@
     return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
   }
 
-  function formatDate(ts) {
+  function formatTime(ts, { withDate = true } = {}) {
     try {
-      return new Date(ts).toLocaleString(undefined, {
-        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-      });
+      const d = new Date(ts);
+      const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      if (!withDate) return time;
+      return `${d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}, ${time}`;
     } catch (_) {
       return new Date(ts).toISOString();
     }
@@ -46,46 +55,74 @@
     return `${(n / 1024 / 1024).toFixed(1)} MB`;
   }
 
-  const STATUS_LABEL = {
-    saved: 'Saved',
-    uploading: 'Uploading',
-    transcribing: 'Transcribing',
-    done: 'Done',
-    error: 'Error',
-  };
+  /** "Today" / "Yesterday" / "This week" / "This month" / "Earlier" bucket. */
+  function dateGroup(ts) {
+    const now = new Date();
+    const d = new Date(ts);
+    const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const today = startOfDay(now);
+    const day = 24 * 60 * 60 * 1000;
+    const t = startOfDay(d);
+    if (t >= today) return 'Today';
+    if (t >= today - day) return 'Yesterday';
+    if (t >= today - 6 * day) return 'This week';
+    if (t >= today - 30 * day) return 'This month';
+    return 'Earlier';
+  }
 
+  const STATUS_LABEL = { saved: 'Saved', uploading: 'Uploading', transcribing: 'Transcribing', done: 'Done', error: 'Error' };
   const SOURCE_LABEL = { recording: 'Recorded', import: 'Imported' };
+  const SOURCE_ICON = { recording: '#i-mic', import: '#i-file' };
+
+  /** Display title: user-set title, else the original filename without extension. */
+  function displayTitle(rec) {
+    if (rec.title && rec.title.trim()) return rec.title.trim();
+    return (rec.originalName || 'Recording').replace(/\.[^.]+$/, '');
+  }
 
   let toastTimer = null;
   function toast(message, kind = '') {
-    const el = $('#toast');
-    el.textContent = message;
-    el.className = `toast ${kind}`;
+    const node = $('#toast');
+    node.textContent = message;
+    node.className = `toast ${kind}`;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.add('hidden'), kind === 'error' ? 6000 : 3000);
+    toastTimer = setTimeout(() => node.classList.add('hidden'), kind === 'error' ? 6000 : 3000);
   }
 
   function showHomeError(message) {
-    const el = $('#home-error');
+    const node = $('#home-error');
     if (!message) {
-      el.classList.add('hidden');
-      el.textContent = '';
+      node.classList.add('hidden');
+      node.textContent = '';
       return;
     }
-    el.textContent = message;
-    el.classList.remove('hidden');
+    node.textContent = message;
+    node.classList.remove('hidden');
   }
 
   function el(tag, attrs = {}, children = []) {
     const node = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
+      if (v === undefined || v === null || v === false) continue;
       if (k === 'class') node.className = v;
       else if (k === 'text') node.textContent = v;
       else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+      else if (k === 'disabled' || k === 'checked') node[k] = Boolean(v);
       else node.setAttribute(k, v);
     }
     for (const c of children) if (c) node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
     return node;
+  }
+
+  /** Inline SVG icon referencing the sprite in index.html. */
+  function icon(id, cls = 'icon') {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', cls);
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', id);
+    svg.appendChild(use);
+    return svg;
   }
 
   /** Try to read the duration of an audio file via the browser decoder. Returns null on failure. */
@@ -104,15 +141,23 @@
     }
   }
 
+  /** Persist a metadata edit and merge the result into local state (no re-render). */
+  async function saveMeta(id, patch) {
+    const rec = await window.api.recordings.updateMeta(id, patch);
+    upsertRecording(rec, { rerender: false });
+    return rec;
+  }
+
   // ------------------------------------------------------------ navigation
   function showScreen(name) {
     state.screen = name;
     $$('.screen').forEach((s) => s.classList.toggle('active', s.id === `screen-${name}`));
     $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.screen === name));
-    if (name === 'history') renderHistory();
+    if (name === 'history') history.renderHistory();
+    else history.stopPlayer();
   }
 
-  $$('.nav-btn').forEach((btn) => btn.addEventListener('click', () => showScreen(btn.dataset.screen)));
+  $$('.nav-btn, #backend-indicator').forEach((btn) => btn.addEventListener('click', () => showScreen(btn.dataset.screen)));
 
   // ------------------------------------------------------------ recording
   function updateLevel(rms) {
@@ -125,7 +170,7 @@
     timerEl.classList.add('active');
     timerEl.textContent = '00:00';
     timerInterval = setInterval(() => {
-      timerEl.textContent = formatDuration(recorder.elapsedSeconds());
+      timerEl.textContent = formatDuration(recorder.elapsedSeconds()) || '00:00';
     }, 250);
   }
 
@@ -153,7 +198,7 @@
         const { buffer, durationSec } = await recorder.stop();
         stopTimer();
         setRecordingUi(false);
-        $('#timer').textContent = formatDuration(durationSec);
+        $('#timer').textContent = formatDuration(durationSec) || '00:00';
         if (durationSec < 0.5) {
           showHomeError('That recording was too short to transcribe. Hold the button a little longer.');
           return;
@@ -224,7 +269,7 @@
       if (local) {
         local.durationSec = d;
         renderStatusCard();
-        if (state.screen === 'history') renderHistory();
+        if (state.screen === 'history') history.renderHistory();
       }
       window.api.recordings.setDuration(rec.id, d).catch(() => {});
     }
@@ -265,7 +310,6 @@
       state.busy = false;
     }
   });
-  // Prevent the window from navigating when a file is dropped elsewhere.
   window.addEventListener('dragover', (e) => e.preventDefault());
   window.addEventListener('drop', (e) => e.preventDefault());
 
@@ -283,10 +327,10 @@
       return;
     }
     card.classList.remove('hidden');
-    $('#status-name').textContent = `${rec.originalName}${Number.isFinite(rec.durationSec) ? ` · ${formatDuration(rec.durationSec)}` : ''}`;
-    const src = $('#status-source');
-    src.textContent = SOURCE_LABEL[rec.source] || rec.source;
-    src.className = `tag ${rec.source}`;
+    const dur = formatDuration(rec.durationSec);
+    $('#status-name').textContent = `${displayTitle(rec)}${dur ? ` · ${dur}` : ''}`;
+    $('#status-name').title = rec.originalName;
+    $('#status-source-icon').querySelector('use').setAttribute('href', SOURCE_ICON[rec.source] || '#i-mic');
 
     const order = ['uploading', 'transcribing', 'done'];
     const currentIdx = rec.status === 'saved' ? -1 : order.indexOf(rec.status);
@@ -294,7 +338,6 @@
       const idx = order.indexOf(li.dataset.step);
       li.classList.remove('active', 'complete', 'failed');
       if (rec.status === 'error') {
-        // Mark the step we failed on. Error after jobId => transcribing, else uploading.
         const failedStep = rec.jobId ? 'transcribing' : 'uploading';
         const failedIdx = order.indexOf(failedStep);
         if (idx < failedIdx) li.classList.add('complete');
@@ -313,8 +356,10 @@
     if (rec.status === 'error') msg.textContent = rec.error || 'Something went wrong.';
     else if (rec.status === 'uploading') msg.textContent = 'Uploading audio to the backend…';
     else if (rec.status === 'transcribing') msg.textContent = 'Transcription in progress. This can take a while for long recordings — checking every few seconds.';
-    else if (rec.status === 'done') msg.textContent = rec.transcript ? `${rec.transcript.slice(0, 200)}${rec.transcript.length > 200 ? '…' : ''}` : 'Transcript is empty.';
-    else msg.textContent = 'Saved locally.';
+    else if (rec.status === 'done') {
+      const preview = (rec.summary && rec.summary.trim()) || rec.transcript || '';
+      msg.textContent = preview ? `${preview.slice(0, 200)}${preview.length > 200 ? '…' : ''}` : 'Transcript is empty.';
+    } else msg.textContent = 'Saved locally.';
 
     $('#status-view-btn').classList.toggle('hidden', rec.status !== 'done');
     $('#status-retry-btn').classList.toggle('hidden', rec.status !== 'error');
@@ -325,6 +370,7 @@
     showScreen('history');
   });
   $('#status-retry-btn').addEventListener('click', () => retry(state.activeId));
+  $('#status-dismiss-btn').addEventListener('click', () => setActive(null));
 
   async function retry(id) {
     try {
@@ -335,15 +381,16 @@
     }
   }
 
-  // ------------------------------------------------------------ history
-  function upsertRecording(rec) {
+  // ------------------------------------------------------------ shared record bookkeeping
+  function upsertRecording(rec, { rerender = true } = {}) {
     const idx = state.recordings.findIndex((r) => r.id === rec.id);
     if (idx === -1) state.recordings.unshift(rec);
     else state.recordings[idx] = { ...state.recordings[idx], ...rec };
     state.recordings.sort((a, b) => b.createdAt - a.createdAt);
     updateBadge();
+    if (!rerender) return;
     if (rec.id === state.activeId) renderStatusCard();
-    if (state.screen === 'history') renderHistory();
+    if (state.screen === 'history') history.renderHistory();
   }
 
   function updateBadge() {
@@ -353,213 +400,38 @@
     badge.classList.toggle('hidden', active === 0);
   }
 
-  function renderHistory() {
-    const list = $('#history-list');
-    list.innerHTML = '';
-    if (!state.recordings.length) {
-      list.appendChild(el('div', { class: 'empty', text: 'No recordings yet.' }));
-    }
-    for (const rec of state.recordings) {
-      const item = el('div', {
-        class: `history-item${rec.id === state.selectedId ? ' selected' : ''}`,
-        'data-id': rec.id,
-        onclick: () => {
-          state.selectedId = rec.id;
-          renderHistory();
-        },
-      }, [
-        el('div', { class: 'title', text: rec.originalName, title: rec.originalName }),
-        el('div', { class: 'meta' }, [
-          el('span', { text: formatDate(rec.createdAt) }),
-          el('span', { text: `· ${formatDuration(rec.durationSec)}` }),
-          el('span', { class: `tag ${rec.source}`, text: SOURCE_LABEL[rec.source] || rec.source }),
-          el('span', { class: `tag status-${rec.status}`, text: STATUS_LABEL[rec.status] || rec.status }),
-        ]),
-      ]);
-      list.appendChild(item);
-    }
-    renderTranscript();
-  }
+  // History module (history.js) receives the shared helpers it needs.
+  const history = window.MeetingScribeHistory({
+    state, el, icon, $, $$, toast, retry, upsertRecording, saveMeta, showScreen, updateBadge,
+    formatDuration, formatTime, formatBytes, dateGroup, displayTitle,
+    STATUS_LABEL, SOURCE_LABEL, SOURCE_ICON,
+  });
 
-  function renderTranscript() {
-    const view = $('#transcript-view');
-    view.innerHTML = '';
-    const rec = state.recordings.find((r) => r.id === state.selectedId);
-    if (!rec) {
-      view.appendChild(el('div', { class: 'empty', text: 'Select a recording to view its transcript.' }));
-      return;
-    }
-
-    const hasTranscript = rec.status === 'done' && typeof rec.transcript === 'string';
-    const actions = el('div', { class: 'transcript-actions' }, [
-      el('button', {
-        class: 'btn btn-secondary btn-small',
-        text: 'Copy',
-        disabled: hasTranscript ? undefined : 'true',
-        onclick: async () => {
-          try {
-            await window.api.transcript.copy(rec.id);
-            toast(rec.summary ? 'Summary and transcript copied to clipboard' : 'Transcript copied to clipboard', 'success');
-          } catch (err) {
-            toast(err.message, 'error');
-          }
-        },
-      }),
-      el('button', {
-        class: 'btn btn-secondary btn-small',
-        text: 'Export .txt',
-        disabled: hasTranscript ? undefined : 'true',
-        onclick: async () => {
-          try {
-            const p = await window.api.transcript.export(rec.id);
-            if (p) toast(`Saved to ${p}`, 'success');
-          } catch (err) {
-            toast(err.message, 'error');
-          }
-        },
-      }),
-      rec.status === 'error' || rec.status === 'saved'
-        ? el('button', { class: 'btn btn-primary btn-small', text: 'Retry', onclick: () => retry(rec.id) })
-        : null,
-      el('button', {
-        class: 'btn btn-secondary btn-small',
-        text: 'Show file',
-        onclick: () => window.api.app.showInFolder(rec.filePath),
-      }),
-      el('button', {
-        class: 'btn btn-danger btn-small',
-        text: 'Delete',
-        onclick: async () => {
-          if (!window.confirm(`Delete "${rec.originalName}" and its transcript? This cannot be undone.`)) return;
-          try {
-            await window.api.recordings.delete(rec.id);
-            state.recordings = state.recordings.filter((r) => r.id !== rec.id);
-            if (state.activeId === rec.id) state.activeId = null;
-            state.selectedId = null;
-            updateBadge();
-            renderStatusCard();
-            renderHistory();
-            toast('Deleted');
-          } catch (err) {
-            toast(err.message, 'error');
-          }
-        },
-      }),
-    ].filter(Boolean));
-
-    // Fix disabled attribute semantics: attribute "true"/undefined → boolean
-    actions.querySelectorAll('button').forEach((b) => {
-      if (b.getAttribute('disabled') === 'true') b.disabled = true;
-      else b.removeAttribute('disabled');
-    });
-
-    const head = el('div', { class: 'transcript-head' }, [
-      el('div', {}, [
-        el('h2', { text: rec.originalName }),
-        el('div', { class: 'muted small' }, [
-          el('span', { text: `${formatDate(rec.createdAt)} · ${formatDuration(rec.durationSec)}${rec.sizeBytes ? ` · ${formatBytes(rec.sizeBytes)}` : ''} ` }),
-          el('span', { class: `tag ${rec.source}`, text: SOURCE_LABEL[rec.source] || rec.source }),
-          ' ',
-          el('span', { class: `tag status-${rec.status}`, text: STATUS_LABEL[rec.status] || rec.status }),
-        ]),
-      ]),
-      actions,
-    ]);
-    view.appendChild(head);
-
-    if (hasTranscript) {
-      const body = el('div', { class: 'transcript-body' });
-      const summaryCard = renderSummaryCard(rec);
-      if (summaryCard) body.appendChild(summaryCard);
-      body.appendChild(renderTranscriptText(rec.transcript));
-      view.appendChild(body);
-    } else if (rec.status === 'error') {
-      view.appendChild(el('div', { class: 'alert alert-error', text: rec.error || 'Transcription failed.' }));
-    } else {
-      view.appendChild(el('div', { class: 'transcript-pending', text: `${STATUS_LABEL[rec.status] || rec.status}… the transcript will appear here when it is ready.` }));
-    }
-  }
-
-  /**
-   * Summary + action items card shown above the transcript.
-   *   summary present            -> "Summary" heading + text (+ "Action Items" checklist if any)
-   *   summary null, error set    -> muted "Summary unavailable" note (raw error never shown)
-   *   summary null, no error     -> returns null (older records; render nothing at all)
-   */
-  function renderSummaryCard(rec) {
-    const summary = typeof rec.summary === 'string' && rec.summary.trim() ? rec.summary.trim() : null;
-    const summaryError = typeof rec.summaryError === 'string' && rec.summaryError.trim() ? rec.summaryError : null;
-    if (!summary && !summaryError) return null;
-
-    const card = el('section', { class: 'card summary-card', 'aria-label': 'Summary' });
-    if (!summary) {
-      card.appendChild(el('div', { class: 'summary-unavailable muted small', text: 'Summary unavailable' }));
-      return card;
-    }
-
-    card.appendChild(el('h3', { class: 'summary-heading', text: 'Summary' }));
-    card.appendChild(el('p', { class: 'summary-text', text: summary }));
-
-    const items = Array.isArray(rec.actionItems)
-      ? rec.actionItems.filter((s) => typeof s === 'string' && s.trim())
-      : [];
-    if (items.length) {
-      card.appendChild(el('h3', { class: 'summary-heading', text: 'Action Items' }));
-      const list = el('ul', { class: 'action-items' });
-      for (const item of items) {
-        list.appendChild(el('li', {}, [
-          el('span', { class: 'action-check', 'aria-hidden': 'true' }),
-          el('span', { class: 'action-text', text: item.trim() }),
-        ]));
-      }
-      card.appendChild(list);
-    }
-    return card;
-  }
-
-  /**
-   * Build the transcript body. Paragraphs are separated by blank lines (\n\n)
-   * in the stored text; each becomes its own <p>. Single line breaks inside a
-   * paragraph are kept via `white-space: pre-wrap`. The stored string itself is
-   * never modified here — Copy and Export use it verbatim.
-   */
-  function renderTranscriptText(transcript) {
-    const container = el('div', { class: 'transcript-text' });
-    const text = typeof transcript === 'string' ? transcript : '';
-    if (!text.trim()) {
-      container.appendChild(el('p', { class: 'muted', text: '(empty transcript)' }));
-      return container;
-    }
-    const paragraphs = text
-      .replace(/\r\n?/g, '\n')
-      .split(/\n[ \t]*\n+/)
-      .map((p) => p.replace(/^\n+|\n+$/g, ''))
-      .filter((p) => p.length > 0);
-    for (const p of paragraphs) {
-      container.appendChild(el('p', { text: p }));
-    }
-    return container;
-  }
-
-  $('#open-folder-btn').addEventListener('click', () => window.api.app.openRecordingsFolder());
-
-  // ------------------------------------------------------------ settings
-  function renderBackendIndicator() {
+  // ------------------------------------------------------------ settings (auto-save)
+  function renderBackendIndicator(reach) {
     const ind = $('#backend-indicator');
     const label = ind.querySelector('.label');
-    ind.classList.remove('ok', 'bad');
+    if (reach === true) { ind.classList.add('ok'); ind.classList.remove('bad'); }
+    else if (reach === false) { ind.classList.add('bad'); ind.classList.remove('ok'); }
     if (!state.settings.apiBaseUrl) {
-      label.textContent = 'No backend set';
+      ind.classList.remove('ok', 'bad');
+      label.textContent = 'Not connected';
+      ind.title = 'No backend configured — open Settings';
     } else {
-      label.textContent = state.settings.apiBaseUrl.replace(/^https?:\/\//, '');
-      label.title = state.settings.apiBaseUrl;
+      label.textContent = ind.classList.contains('bad') ? 'Backend unreachable' : ind.classList.contains('ok') ? 'Connected' : 'Backend set';
+      ind.title = state.settings.apiBaseUrl;
     }
   }
 
-  /**
-   * Validate the speaker-count input. Returns { ok, value } where value is an
-   * integer 1..20 or null for blank (auto-detect).
-   */
+  let savedTimer = null;
+  function flashSaved(text = 'Saved') {
+    const node = $('#settings-status');
+    node.textContent = text;
+    node.classList.add('show');
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(() => node.classList.remove('show'), 1800);
+  }
+
   function readNumSpeakersInput() {
     const input = $('#num-speakers');
     const raw = input.value.trim();
@@ -577,82 +449,81 @@
     return { ok: true, value: n };
   }
 
-  // Live feedback while typing, so an out-of-range value is flagged before Save.
-  $('#num-speakers').addEventListener('input', () => {
-    const res = readNumSpeakersInput();
-    const status = $('#settings-status');
-    if (!res.ok) {
-      status.textContent = res.message;
-      status.style.color = 'var(--danger)';
-    } else if (status.style.color === 'var(--danger)') {
-      status.textContent = '';
-      status.style.color = '';
-    }
-  });
+  function setConnStatus(text, kind = '') {
+    const node = $('#connection-status');
+    node.textContent = text;
+    node.className = `field-status ${kind}`;
+  }
 
-  $('#settings-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
+  async function saveSettings() {
     const input = $('#api-base-url');
     const value = input.value.trim();
-    const status = $('#settings-status');
+    input.classList.remove('invalid');
     if (value && !/^https?:\/\/.+/i.test(value)) {
-      status.textContent = 'URL must start with http:// or https://';
-      status.style.color = 'var(--danger)';
-      return;
+      input.classList.add('invalid');
+      setConnStatus('URL must start with http:// or https://', 'bad');
+      return false;
     }
     const speakers = readNumSpeakersInput();
     if (!speakers.ok) {
-      status.textContent = speakers.message;
-      status.style.color = 'var(--danger)';
-      return;
+      flashSaved(speakers.message);
+      return false;
     }
+    const unchanged = value === (state.settings.apiBaseUrl || '') && speakers.value === (state.settings.numSpeakers ?? null);
+    if (unchanged) return true;
     try {
       state.settings = await window.api.settings.update({ apiBaseUrl: value, numSpeakers: speakers.value });
       input.value = state.settings.apiBaseUrl;
       $('#num-speakers').value = state.settings.numSpeakers == null ? '' : String(state.settings.numSpeakers);
-      status.textContent = 'Saved';
-      status.style.color = 'var(--success)';
-      renderBackendIndicator();
-      // The Record screen's "no backend configured" banner is no longer accurate once a URL is saved.
+      renderBackendIndicator(null);
       if (state.settings.apiBaseUrl) showHomeError('');
-      toast('Settings saved', 'success');
+      setConnStatus('');
+      flashSaved('Saved');
+      return true;
     } catch (err) {
-      status.textContent = err.message;
-      status.style.color = 'var(--danger)';
+      flashSaved(err.message);
+      return false;
     }
+  }
+
+  // Auto-save on blur / Enter — never per keystroke, to avoid persisting half-typed URLs.
+  ['#api-base-url', '#num-speakers'].forEach((sel) => {
+    const input = $(sel);
+    input.addEventListener('blur', saveSettings);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    });
   });
+  $('#num-speakers').addEventListener('input', () => {
+    const res = readNumSpeakersInput();
+    if (!res.ok) flashSaved(res.message);
+  });
+  $('#settings-form').addEventListener('submit', (e) => { e.preventDefault(); saveSettings(); });
 
   $('#test-connection-btn').addEventListener('click', async () => {
-    const status = $('#settings-status');
+    await saveSettings();
     const url = $('#api-base-url').value.trim().replace(/\/+$/, '');
     if (!url) {
-      status.textContent = 'Enter a URL first.';
-      status.style.color = 'var(--danger)';
+      setConnStatus('Enter a URL first.', 'bad');
       return;
     }
-    status.textContent = 'Testing…';
-    status.style.color = '';
-    const ind = $('#backend-indicator');
+    setConnStatus('Testing…');
     try {
       const result = await window.api.backend.testConnection(url);
       if (result.reachable) {
-        status.textContent = `Backend reachable (HTTP ${result.status})`;
-        status.style.color = 'var(--success)';
-        ind.classList.add('ok');
-        ind.classList.remove('bad');
+        setConnStatus(`Backend reachable (HTTP ${result.status})`, 'ok');
+        renderBackendIndicator(true);
       } else {
-        status.textContent = result.message;
-        status.style.color = 'var(--danger)';
-        ind.classList.add('bad');
-        ind.classList.remove('ok');
+        setConnStatus(result.message, 'bad');
+        renderBackendIndicator(false);
       }
     } catch (err) {
-      status.textContent = err.message;
-      status.style.color = 'var(--danger)';
-      ind.classList.add('bad');
-      ind.classList.remove('ok');
+      setConnStatus(err.message, 'bad');
+      renderBackendIndicator(false);
     }
   });
+
+  $('#open-folder-btn').addEventListener('click', () => window.api.app.openRecordingsFolder());
 
   // ------------------------------------------------------------ init
   async function init() {
@@ -667,22 +538,23 @@
       $('#api-base-url').value = settings.apiBaseUrl || '';
       $('#num-speakers').value = settings.numSpeakers == null ? '' : String(settings.numSpeakers);
       $('#data-dir').textContent = info.dataDir;
+      $('#data-dir').title = info.dataDir;
       $('#app-version').textContent = `v${info.version}`;
       if (Array.isArray(info.supportedExtensions) && info.supportedExtensions.length) {
-        // Keep the on-screen list in sync with what main-process validation accepts.
         $('#supported-formats').textContent = info.supportedExtensions.join(', ');
         $('#import-btn').title = `Import a ${info.supportedExtensions.join(', ')} file`;
       }
-      renderBackendIndicator();
+      renderBackendIndicator(null);
       updateBadge();
 
-      // Resume showing the most recent in-flight/recent item on the home screen.
       if (recordings.length && (recordings[0].status === 'uploading' || recordings[0].status === 'transcribing')) {
         setActive(recordings[0].id);
       }
       if (!settings.apiBaseUrl) {
         showHomeError('No backend configured yet. Open Settings and enter the API base URL before recording or importing.');
       }
+      // Fill in durations for older imports that were saved without one (fixes "--:--").
+      for (const rec of recordings) if (!Number.isFinite(rec.durationSec) && rec.filePath) backfillDuration(rec);
     } catch (err) {
       toast(`Failed to load app data: ${err.message}`, 'error');
     }
